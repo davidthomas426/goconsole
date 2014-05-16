@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"local/goconsole/interp"
+	"github.com/davidthomas426/goconsole/interp"
 
 	_ "code.google.com/p/go.tools/go/gcimporter"
 	"code.google.com/p/go.tools/go/types"
@@ -57,10 +57,10 @@ var typeMap = new(typeutil.Map)
 
 func main() {
 	importSet := map[Import]bool{
-		Import{Path: "bufio"}:                  true,
-		Import{Path: "fmt"}:                    true,
-		Import{Path: "local/goconsole/interp"}: true,
-		Import{Path: "os"}:                     true,
+		Import{Path: "bufio"}:                                      true,
+		Import{Path: "fmt"}:                                        true,
+		Import{Path: "github.com/davidthomas426/goconsole/interp"}: true,
+		Import{Path: "os"}:                                         true,
 		Import{LocalName: "_", Path: "code.google.com/p/go.tools/go/gcimporter"}: true,
 		Import{Path: "code.google.com/p/go.tools/go/types"}:                      true,
 		Import{Path: "code.google.com/p/go.tools/go/types/typeutil"}:             true,
