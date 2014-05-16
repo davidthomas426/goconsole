@@ -1,7 +1,6 @@
-package goconsole
+package interp
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"log"
@@ -16,8 +15,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 	// Check for constant
 	tv := env.info.Types[expr]
 	if tv.Type == types.Typ[types.UntypedNil] {
-		fmt.Printf("(%#v) %#v, %#v\n", tv.Type, tv.Value, tv)
-
 		obj := Object{
 			Value: tv.Value,
 			Typ:   tv.Type,
@@ -43,9 +40,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		}
 		return []Object{obj}
 	}
-	// I'm assuming it's typed, but let's check...
-	fmt.Printf("Is it typed? ('%s' of type '%v'): %v\n", types.ExprString(expr), tv.Type, isTyped(tv.Type))
-
 	// Not a constant expression, so we have to evaluate it ourselves
 	switch e := expr.(type) {
 	case *ast.FuncLit:
@@ -155,22 +149,29 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		sel := env.info.Selections[e]
 		switch sel.Kind() {
 		case types.FieldVal:
-			fmt.Println("Field value:", sel.String())
+			xo := env.Eval(e.X)[0]
+			v := xo.Value.(reflect.Value)
+			if sel.Indirect() {
+				v = v.Elem()
+			}
+			obj := Object{
+				Value: v.FieldByIndex(sel.Index()),
+				Typ:   sel.Type(),
+			}
+			return []Object{obj}
 		case types.MethodVal:
-			fmt.Println("Method value:", sel.String())
+			log.Fatal("Method values not yet implemented:", sel.String())
 		case types.MethodExpr:
-			fmt.Println("Method expression:", sel.String())
+			log.Fatal("Method expressions not yet implemented:", sel.String())
 		case types.PackageObj:
-			fmt.Println("Qualified identifier:", sel.Obj().Pkg().Name(), sel.Obj().Name())
 			p := sel.Obj().Pkg().Name()
 			obj := sel.Obj().Name()
 			v, ok := env.interp.pkgs[p].Lookup(obj)
 			if !ok {
-				log.Fatal("Package object not found")
+				log.Fatalf("Package object %q not found", obj)
 			}
 			return []Object{v}
 		}
-		log.Fatalf("This type of selector expression not yet implemented")
 	case *ast.CallExpr:
 		switch env.getCallExprKind(e) {
 		case builtinKind:
@@ -204,10 +205,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			}
 			return []Object{obj}
 		case callKind:
-			fmt.Printf("sig: %T: %+[1]v\n", env.info.Types[e.Fun].Type)
-
 			funObj := env.Eval(e.Fun)[0]
-			fmt.Println(funObj)
 			fun := funObj.Value.(reflect.Value)
 
 			if funObj.Sim {
@@ -241,7 +239,15 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 					args = make([]reflect.Value, len(e.Args))
 					for i, argExpr := range e.Args {
 						argObj := env.Eval(argExpr)[0]
-						args[i] = argObj.Value.(reflect.Value)
+
+						rv, ok := argObj.Value.(reflect.Value)
+						if !ok {
+							// Must be passing untyped nil
+							// Use zero value of type instead
+							rtyp := fun.Type().In(i)
+							rv = reflect.Zero(rtyp)
+						}
+						args[i] = rv
 					}
 				}
 

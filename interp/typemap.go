@@ -1,7 +1,6 @@
-package goconsole
+package interp
 
 import (
-	"fmt"
 	"reflect"
 
 	"code.google.com/p/go.tools/go/types"
@@ -28,7 +27,6 @@ func getReflectType(typeMap *typeutil.Map, typ types.Type) (reflect.Type, bool) 
 				return reflect.PtrTo(t), sim
 			}
 		}
-		fmt.Printf("%T: %[1]v\n", typ)
 		return nil, false
 	}
 	return rt.(reflect.Type), false

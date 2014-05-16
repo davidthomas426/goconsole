@@ -1,4 +1,4 @@
-package goconsole
+package interp
 
 import (
 	"bytes"
@@ -82,16 +82,17 @@ func (i *interp) Run(src string) (bool, error) {
 		i.oldSrc = ""
 	}
 
-	declSrc, _ := i.topEnv.dumpScope()
+	declSrc, numDecls := i.topEnv.dumpScope()
 	var allSrcBuf bytes.Buffer
-	allSrcBuf.WriteString("package p;")
+	allSrcBuf.WriteString("package p;import(")
 	for _, pkg := range i.pkgs {
-		fmt.Fprintf(&allSrcBuf, "import \"%s\";", pkg.Pkg.Path())
+		fmt.Fprintf(&allSrcBuf, "%q;", pkg.Pkg.Path())
 	}
+	allSrcBuf.WriteString(");func _(){")
 	allSrcBuf.WriteString(declSrc)
-	allSrcBuf.WriteString("func _(){")
+	allSrcBuf.WriteString("{")
 	allSrcBuf.WriteString(src)
-	allSrcBuf.WriteString("\n}")
+	allSrcBuf.WriteString("\n}}")
 	allSrc := allSrcBuf.String()
 	fileSize := len(allSrc)
 
@@ -101,22 +102,32 @@ func (i *interp) Run(src string) (bool, error) {
 	if err != nil {
 		if errList, ok := err.(scanner.ErrorList); ok {
 			for j, err := range errList {
-				// Check if the error is at EOF or at the closing brace we added
-				//fmt.Println("pos:", err.Pos.Offset, "filesize:", fileSize)
-				if err.Pos.Offset == fileSize || err.Pos.Offset == fileSize-1 {
+				// Check if the error is at EOF or at a closing brace we added
+				if err.Pos.Offset >= fileSize-2 {
 					// If this is the first error, it actually just means the source is incomplete,
 					// unless there is a superfluous '}' at the end of their code
 					if j == 0 && err.Msg != "expected declaration, found '}'" {
 						i.oldSrc = src
 						return true, nil
 					}
-				} else {
-					fmt.Println("Parse error:", err)
 				}
 			}
 		} else {
 			log.Fatal("Parsing yielded a non-nil error that's not a scanner.ErrorList")
 		}
+		return false, err
+	}
+
+	if len(file.Decls) != 2 {
+		// There must be an extra closing brace that escaped our _ function
+		err := fmt.Errorf("Unexpected '}'")
+		return false, err
+	}
+
+	stmtList := file.Decls[len(file.Decls)-1].(*ast.FuncDecl).Body.List
+	if len(stmtList) != numDecls+1 {
+		// There must be an extra closing brace that escaped our block statement
+		err := fmt.Errorf("Unexpected '}'")
 		return false, err
 	}
 
@@ -132,17 +143,16 @@ func (i *interp) Run(src string) (bool, error) {
 	files := []*ast.File{file}
 	pkg, _ := i.checker.config.Check("", fset, files, &info)
 	if len(i.checker.errs) > 0 {
-		fmt.Println("Type error:", i.checker.errs[0])
 		return false, i.checker.errs[0]
 	}
-	// get the scope of the wrapper function for the user code
-	ps := pkg.Scope().Child(0)
-	nc := ps.NumChildren()
-	i.topEnv.scope = ps.Child(nc - 1)
+	// get the scope of the block stmt containing user code
+	pkgScope := pkg.Scope().Child(0)
+	undScope := pkgScope.Child(pkgScope.NumChildren() - 1)
+	i.topEnv.scope = undScope.Child(undScope.NumChildren() - 1)
 	i.topEnv.info = &info
 
 	// Extract the statement list provided by the user
-	stmtList := file.Decls[len(file.Decls)-1].(*ast.FuncDecl).Body.List
+	stmtList = stmtList[numDecls].(*ast.BlockStmt).List
 	if len(stmtList) == 0 {
 		return false, nil
 	}

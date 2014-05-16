@@ -1,4 +1,4 @@
-package goconsole
+package interp
 
 import (
 	"reflect"

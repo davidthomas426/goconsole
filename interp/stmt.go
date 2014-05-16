@@ -1,4 +1,4 @@
-package goconsole
+package interp
 
 import (
 	"fmt"
@@ -50,13 +50,11 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 				identDef := env.info.Defs[ident]
 				if identDef == nil || identDef.Pos() != ident.Pos() {
 					// Redeclaration: variable already exists in current scope. Just assign the new value.
-					fmt.Printf("Setting %s to %v\n", ident.Name, rval.Interface())
 					lhs, _ := env.lookup(ident.Name)
 					lval := lhs.Value.(reflect.Value)
 					lval.Set(rval)
 				} else {
 					// New variable declaration. Create new variable with the right value.
-					fmt.Printf("Creating %s with value %v\n", ident.Name, rval.Interface())
 					typ := rval.Type()
 					sv := reflect.New(typ).Elem()
 					sv.Set(rval)
@@ -100,7 +98,6 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 			}
 
 			for i, obj := range lhs {
-				//fmt.Printf("Setting variable to %v\n", rhs[i].Interface())
 				v := obj.Value.(reflect.Value)
 				if rhs[i].IsValid() {
 					v.Set(rhs[i])
@@ -110,7 +107,6 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 			}
 		}
 	case *ast.ExprStmt:
-		fmt.Println("It's an expression statement")
 		// If we're not at top level, then only call expressions and receive operations are valid statements
 		if !topLevel {
 			if _, ok := stmt.X.(*ast.CallExpr); !ok {

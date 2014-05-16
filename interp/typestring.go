@@ -31,11 +31,11 @@
 // This is a custom version of this file derived from
 // code.google.com/p/go.tools/go/types/typestring.go.
 // The way named types are printed is different, to match
-// the way the language parses the type (i.e., using the package
-// name instead of the package path). GcCompatibilityMode is gone,
-// too.
+// the way the language parses the type (e.g., using the package
+// name instead of the package path in qualified type names).
+// GcCompatibilityMode is gone, too.
 
-package goconsole
+package interp
 
 import (
 	"bytes"
