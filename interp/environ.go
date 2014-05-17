@@ -13,6 +13,7 @@ type environ struct {
 	scope  *types.Scope
 	parent *environ
 	objs   map[string]Object
+	names  []string
 }
 
 func (env *environ) lookup(s string) (Object, bool) {
@@ -53,23 +54,12 @@ func (env *environ) addVar(varInfo *types.Var, typ reflect.Type, obj Object) {
 
 func (env *environ) dumpScope() (string, int) {
 	lines := []string{}
-	currNames := map[string]bool{}
-	getLines := func(scope *types.Scope) {
-		for _, name := range scope.Names() {
-			if currNames[name] {
-				continue
-			}
-			t := scope.Lookup(name)
-			switch t.(type) {
-			case *types.Var:
-				currNames[name] = true
-				lines = append(lines, "var "+name+" "+TypeString(t.Type()))
-			}
+	for _, name := range env.names {
+		t := env.scope.LookupParent(name)
+		switch t.(type) {
+		case *types.Var:
+			lines = append(lines, "var "+name+" "+TypeString(t.Type()))
 		}
-	}
-	// Go up at most three levels
-	for i, scope := 0, env.scope; i < 3 && scope != nil; i, scope = i+1, scope.Parent() {
-		getLines(scope)
 	}
 	if len(lines) == 0 {
 		return "", 0

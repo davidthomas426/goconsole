@@ -59,6 +59,11 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 					sv := reflect.New(typ).Elem()
 					sv.Set(rval)
 					obj.Value = sv
+					// Add the name we're declaring to env.names if it's a new name
+					if _, ok := env.lookup(ident.Name); !ok {
+						env.names = append(env.names, ident.Name)
+					}
+					// Add the object to env.objs
 					env.objs[ident.Name] = obj
 				}
 			}
