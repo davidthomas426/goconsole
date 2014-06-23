@@ -15,11 +15,13 @@ import (
 )
 
 type interp struct {
-	oldSrc  string
-	topEnv  *environ
-	pkgs    map[string]*Package
-	checker *checker
-	typeMap *typeutil.Map
+	oldSrc       string
+	topEnv       *environ
+	pkgs         map[string]*Package
+	checker      *checker
+	typeMap      *typeutil.Map
+	stmtLists    []string
+	stmtListLens []int
 }
 
 func newInterp(pkgs []*Package, pkgMap map[string]*types.Package, typeMap *typeutil.Map) Interpreter {
@@ -82,17 +84,28 @@ func (i *interp) Run(src string) (bool, error) {
 		i.oldSrc = ""
 	}
 
-	declSrc, numDecls := i.topEnv.dumpScope()
+	// TODO: Only dump out declarations after each input rather than entire history of source.
 	var allSrcBuf bytes.Buffer
 	allSrcBuf.WriteString("package p;import(")
 	for _, pkg := range i.pkgs {
 		fmt.Fprintf(&allSrcBuf, "%q;", pkg.Pkg.Path())
 	}
 	allSrcBuf.WriteString(");func _(){")
-	allSrcBuf.WriteString(declSrc)
-	allSrcBuf.WriteString("{")
+
+	// Add previous code, one stmtList at a time, each in a nested scope
+	for _, stmtList := range i.stmtLists {
+		allSrcBuf.WriteString(stmtList)
+		allSrcBuf.WriteString("\n{")
+	}
+	// Add current code in the innermost scope and close the scopes
 	allSrcBuf.WriteString(src)
-	allSrcBuf.WriteString("\n}}")
+	allSrcBuf.WriteString("\n")
+	for _ = range i.stmtLists {
+		allSrcBuf.WriteString("}")
+	}
+	allSrcBuf.WriteString("}")
+
+	// Get the source "file" as a string
 	allSrc := allSrcBuf.String()
 	fileSize := len(allSrc)
 
@@ -119,16 +132,29 @@ func (i *interp) Run(src string) (bool, error) {
 	}
 
 	if len(file.Decls) != 2 {
-		// There must be an extra closing brace that escaped our _ function
+		// The input must have done something strange with braces
 		err := fmt.Errorf("Unexpected '}'")
 		return false, err
 	}
 
+	// Walk down the scopes to the inner statement list, checking that nothing
+	// looks wrong along the way
 	stmtList := file.Decls[len(file.Decls)-1].(*ast.FuncDecl).Body.List
-	if len(stmtList) != numDecls+1 {
-		// There must be an extra closing brace that escaped our block statement
-		err := fmt.Errorf("Unexpected '}'")
-		return false, err
+	for j := range i.stmtLists {
+		if len(stmtList) != i.stmtListLens[j]+1 {
+			// There must be an extra closing brace that escaped our block statement
+			err := fmt.Errorf("Unexpected '}'")
+			return false, err
+		}
+		blockStmt, ok := stmtList[len(stmtList)-1].(*ast.BlockStmt)
+		if !ok {
+			err := fmt.Errorf("Parse error")
+			return false, err
+		}
+		stmtList = blockStmt.List
+	}
+	if len(stmtList) == 0 {
+		return false, nil
 	}
 
 	// Clear the type-checker errors and create a struct to hold type info
@@ -145,20 +171,27 @@ func (i *interp) Run(src string) (bool, error) {
 	if len(i.checker.errs) > 0 {
 		return false, i.checker.errs[0]
 	}
-	// get the scope of the block stmt containing user code
+
+	// Walk down the scopes to the inner statement list, checking that nothing
+	// looks wrong along the way
 	pkgScope := pkg.Scope().Child(0)
 	undScope := pkgScope.Child(pkgScope.NumChildren() - 1)
-	i.topEnv.scope = undScope.Child(undScope.NumChildren() - 1)
+	currScope := undScope
+	for _ = range i.stmtLists {
+		currScope = currScope.Child(currScope.NumChildren() - 1)
+	}
+	// get the scope of the block stmt containing user code
+	i.topEnv.scope = currScope
 	i.topEnv.info = &info
 
-	// Extract the statement list provided by the user
-	stmtList = stmtList[numDecls].(*ast.BlockStmt).List
-	if len(stmtList) == 0 {
-		return false, nil
-	}
 	// Run each statement in the list
 	for _, stmt := range stmtList {
 		i.topEnv.runStmt(stmt, true)
 	}
+
+	// Add current input to the stmtLists slice for next time
+	i.stmtLists = append(i.stmtLists, src)
+	i.stmtListLens = append(i.stmtListLens, len(stmtList))
+
 	return false, nil
 }
