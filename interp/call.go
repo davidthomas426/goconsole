@@ -32,7 +32,7 @@ func (env *environ) getCallExprKind(callExpr *ast.CallExpr) callExprKind {
 			obj := env.info.Uses[e]
 			return kindFromObj(obj)
 		case *ast.SelectorExpr:
-			obj := env.info.Selections[e].Obj()
+			obj := env.info.Uses[e.Sel]
 			return kindFromObj(obj)
 		case *ast.ArrayType, *ast.ChanType, *ast.InterfaceType,
 			*ast.FuncType, *ast.MapType, *ast.StructType:
@@ -44,6 +44,5 @@ func (env *environ) getCallExprKind(callExpr *ast.CallExpr) callExprKind {
 		}
 		return callKind
 	}
-
 	return kindFromSubExpr(callExpr.Fun)
 }

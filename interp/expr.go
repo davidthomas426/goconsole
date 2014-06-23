@@ -146,7 +146,17 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		return env.Eval(e.X)
 	case *ast.SelectorExpr:
 		// TODO: implement selector expressions!
-		sel := env.info.Selections[e]
+		sel, ok := env.info.Selections[e]
+		if !ok {
+			// Then this selector expression denotes a package object
+			obj := env.info.Uses[e.Sel]
+			p := obj.Pkg().Name()
+			v, ok := env.interp.pkgs[p].Lookup(obj.Name())
+			if !ok {
+				log.Fatalf("Package object %q not found", obj)
+			}
+			return []Object{v}
+		}
 		switch sel.Kind() {
 		case types.FieldVal:
 			xo := env.Eval(e.X)[0]
@@ -163,14 +173,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			log.Fatal("Method values not yet implemented:", sel.String())
 		case types.MethodExpr:
 			log.Fatal("Method expressions not yet implemented:", sel.String())
-		case types.PackageObj:
-			p := sel.Obj().Pkg().Name()
-			obj := sel.Obj().Name()
-			v, ok := env.interp.pkgs[p].Lookup(obj)
-			if !ok {
-				log.Fatalf("Package object %q not found", obj)
-			}
-			return []Object{v}
 		}
 	case *ast.CallExpr:
 		switch env.getCallExprKind(e) {
