@@ -132,5 +132,7 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 				}
 			}
 		}
+	case *ast.GoStmt:
+		env.evalFuncCall(stmt.Call, true)
 	}
 }
