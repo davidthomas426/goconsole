@@ -105,6 +105,18 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 				Typ:   typ,
 			}
 			return []Object{obj}
+		case token.ARROW:
+			// TODO: Currently only handles version with single return
+			// TODO: Doesn't currently handle channels of simulated type
+			xObj := env.Eval(e.X)[0]
+			xVal := xObj.Value.(reflect.Value)
+			newVal, _ := xVal.Recv()
+			typ := env.info.Types[expr].Type
+			obj := Object{
+				Value: newVal,
+				Typ:   typ,
+			}
+			return []Object{obj}
 		default:
 			log.Fatalf("Unary operator %q not implemented", e.Op)
 		}
