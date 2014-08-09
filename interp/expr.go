@@ -207,64 +207,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			}
 			return []Object{obj}
 		case callKind:
-			funObj := env.Eval(e.Fun)[0]
-			fun := funObj.Value.(reflect.Value)
-
-			if funObj.Sim {
-				var args []Object
-				if len(e.Args) == 1 {
-					// Single argument expression, potentially multi-valued
-					args = env.Eval(e.Args[0])
-				} else {
-					// Multiple argument expressions, each single-valued
-					args = make([]Object, len(e.Args))
-					for i, argExpr := range e.Args {
-						args[i] = env.Eval(argExpr)[0]
-					}
-				}
-
-				// Call by actually calling it
-				funVal := fun.Interface().(func([]Object) []Object)
-				results := funVal(args)
-				return results
-			} else {
-				var args []reflect.Value
-				if len(e.Args) == 1 {
-					// Single argument expression, potentially multi-valued
-					vals := env.Eval(e.Args[0])
-					args = make([]reflect.Value, len(vals))
-					for i, val := range vals {
-						args[i] = val.Value.(reflect.Value)
-					}
-				} else {
-					// Multiple argument expressions, each single-valued
-					args = make([]reflect.Value, len(e.Args))
-					for i, argExpr := range e.Args {
-						argObj := env.Eval(argExpr)[0]
-
-						rv, ok := argObj.Value.(reflect.Value)
-						if !ok {
-							// Must be passing untyped nil
-							// Use zero value of type instead
-							rtyp := fun.Type().In(i)
-							rv = reflect.Zero(rtyp)
-						}
-						args[i] = rv
-					}
-				}
-
-				resultVals := fun.Call(args)
-
-				// Wrap the output values in Objects
-				results := make([]Object, len(resultVals))
-				for i, resVal := range resultVals {
-					results[i] = Object{
-						Value: resVal,
-						Typ:   funObj.Typ.Underlying().(*types.Signature).Results().At(i).Type(),
-					}
-				}
-				return results
-			}
+			return env.evalFuncCall(e, false)
 		}
 	default:
 		log.Fatalf("Unhandled expression type: %T", e)
