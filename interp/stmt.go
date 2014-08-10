@@ -145,5 +145,7 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 		chanVal := chanObj.Value.(reflect.Value)
 		sentVal := sentObj.Value.(reflect.Value)
 		chanVal.Send(sentVal)
+	default:
+		log.Fatalf("Unhandled statement type: %T", stmt)
 	}
 }
