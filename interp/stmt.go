@@ -133,7 +133,12 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 			}
 		}
 	case *ast.GoStmt:
-		env.evalFuncCall(stmt.Call, true)
+		callKind := env.getCallExprKind(stmt.Call)
+		if callKind == builtinKind {
+			env.evalBuiltinCall(stmt.Call, true)
+		} else {
+			env.evalFuncCall(stmt.Call, true)
+		}
 	case *ast.SendStmt:
 		chanObj := env.Eval(stmt.Chan)[0]
 		sentObj := env.Eval(stmt.Value)[0]

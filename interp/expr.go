@@ -189,8 +189,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 	case *ast.CallExpr:
 		switch env.getCallExprKind(e) {
 		case builtinKind:
-			// TODO: implement builtins
-			log.Fatal("Builtins not handled yet")
+			return env.evalBuiltinCall(e, false)
 		case conversionKind:
 			// Get the type we're converting to
 			typ := env.info.Types[e.Fun].Type
