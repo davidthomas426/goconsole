@@ -7,6 +7,12 @@ import (
 	"code.google.com/p/go.tools/go/types/typeutil"
 )
 
+// TODO: Handle "generic" types
+//   * slice types
+//   * chan types
+//   * map types
+//   * array types (must be simulated)
+
 var simFuncType reflect.Type
 
 func init() {
