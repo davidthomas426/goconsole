@@ -42,7 +42,11 @@ func (env *environ) addVar(varInfo *types.Var, typ reflect.Type, obj Object) {
 	}
 	// Create a variable of the right type with the zero value, then set its value from obj
 	newVal := reflect.New(typ).Elem()
-	rval := obj.Value.(reflect.Value)
+	rval, ok := obj.Value.(reflect.Value)
+	if !ok {
+		// Must be untyped nil. Use zero value of type instead
+		rval = reflect.Zero(typ)
+	}
 	newVal.Set(rval)
 	newObj := Object{
 		Value: newVal,
