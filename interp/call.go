@@ -48,60 +48,64 @@ func (env *environ) getCallExprKind(callExpr *ast.CallExpr) callExprKind {
 	return kindFromSubExpr(callExpr.Fun)
 }
 
+func (env *environ) evalFuncArgs(argExprs []ast.Expr) []Object {
+	var args []Object
+	if len(args) == 1 {
+		// Single argument expression, potentially multi-valued
+		args = env.Eval(argExprs[0])
+	} else {
+		// Multiple argument expressions, each single-valued
+		args = make([]Object, len(argExprs))
+		for i, argExpr := range argExprs {
+			args[i] = env.Eval(argExpr)[0]
+		}
+	}
+	return args
+}
+
+// callFunWithObjs calls the given function on the arguments given as a slice of Object.
+// It first converts the arguments to a slice of reflect.Value. It assumes that any Object
+// in the given slice whose Value field is not a reflect.Value is an untyped nil, which
+// should always be true in practice.
+func callFunWithObjs(fun reflect.Value, argObjs []Object) []reflect.Value {
+	argVals := make([]reflect.Value, len(argObjs))
+	funType := fun.Type()
+	for i, argObj := range argObjs {
+		argVal, ok := argObj.Value.(reflect.Value)
+		if !ok {
+			// Must be untyped nil. Use zero value of type instead
+			var rtyp reflect.Type
+			if funType.IsVariadic() && i == funType.NumIn()-1 {
+				rtyp = funType.In(i).Elem()
+			} else {
+				rtyp = fun.Type().In(i)
+			}
+			argVal = reflect.Zero(rtyp)
+		}
+		argVals[i] = argVal
+	}
+	return fun.Call(argVals)
+}
+
 func (env *environ) evalFuncCall(callExpr *ast.CallExpr, async bool) []Object {
 	funObj := env.Eval(callExpr.Fun)[0]
 	fun := funObj.Value.(reflect.Value)
 
+	argObjs := env.evalFuncArgs(callExpr.Args)
 	if funObj.Sim {
-		var args []Object
-		if len(callExpr.Args) == 1 {
-			// Single argument expression, potentially multi-valued
-			args = env.Eval(callExpr.Args[0])
-		} else {
-			// Multiple argument expressions, each single-valued
-			args = make([]Object, len(callExpr.Args))
-			for i, argExpr := range callExpr.Args {
-				args[i] = env.Eval(argExpr)[0]
-			}
-		}
-
 		// Call by actually calling it
 		funVal := fun.Interface().(func([]Object) []Object)
 		if !async {
-			results := funVal(args)
+			results := funVal(argObjs)
 			return results
 		} else {
-			go funVal(args)
+			go funVal(argObjs)
 			return nil
 		}
 	} else {
-		var args []reflect.Value
-		if len(callExpr.Args) == 1 {
-			// Single argument expression, potentially multi-valued
-			vals := env.Eval(callExpr.Args[0])
-			args = make([]reflect.Value, len(vals))
-			for i, val := range vals {
-				args[i] = val.Value.(reflect.Value)
-			}
-		} else {
-			// Multiple argument expressions, each single-valued
-			args = make([]reflect.Value, len(callExpr.Args))
-			for i, argExpr := range callExpr.Args {
-				argObj := env.Eval(argExpr)[0]
-
-				rv, ok := argObj.Value.(reflect.Value)
-				if !ok {
-					// Must be passing untyped nil
-					// Use zero value of type instead
-					rtyp := fun.Type().In(i)
-					rv = reflect.Zero(rtyp)
-				}
-				args[i] = rv
-			}
-		}
-
+		// Now call the function on the args
 		if !async {
-			resultVals := fun.Call(args)
+			resultVals := callFunWithObjs(fun, argObjs)
 
 			// Wrap the output values in Objects
 			results := make([]Object, len(resultVals))
@@ -113,7 +117,7 @@ func (env *environ) evalFuncCall(callExpr *ast.CallExpr, async bool) []Object {
 			}
 			return results
 		} else {
-			go fun.Call(args)
+			go callFunWithObjs(fun, argObjs)
 			return nil
 		}
 
