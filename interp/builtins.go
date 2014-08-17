@@ -28,7 +28,8 @@ func (env *environ) evalBuiltinCall(callExpr *ast.CallExpr, async bool) []Object
 	case "len":
 		log.Fatal("len function not implemented yet")
 	case "make":
-		log.Fatal("make function not implemented yet")
+		obj := env.evalMake(callExpr.Args)
+		return []Object{obj}
 	case "new":
 		log.Fatal("new function not implemented yet")
 	case "panic":
@@ -57,4 +58,50 @@ func (env *environ) evalBuiltinCall(callExpr *ast.CallExpr, async bool) []Object
 		log.Fatal("recover function not implemented yet")
 	}
 	return results
+}
+
+func (env *environ) evalMake(argExprs []ast.Expr) Object {
+	// TODO: not finished!
+	typeExpr := argExprs[0]
+	typ := env.info.Types[typeExpr].Type
+	rtyp, sim := getReflectType(env.interp.typeMap, typ)
+	if rtyp == nil {
+		log.Fatal("Failed to get reflect.Type to make")
+	}
+	switch rtyp.Kind() {
+	case reflect.Chan:
+		buffer := 0
+		if len(argExprs) > 1 {
+			args := env.evalFuncArgs(argExprs[1:])
+			buffer = int(args[0].Value.(reflect.Value).Int())
+		}
+		chanVal := reflect.MakeChan(rtyp, buffer)
+		return Object{
+			Value: chanVal,
+			Typ:   typ,
+			Sim:   sim,
+		}
+	case reflect.Map:
+		log.Fatal("make function for map types not implemented yet")
+	case reflect.Slice:
+		args := env.evalFuncArgs(argExprs[1:])
+		sliceLen := int(args[0].Value.(reflect.Value).Int())
+		sliceCap := sliceLen
+		if len(args) > 1 {
+			sliceCap = int(args[1].Value.(reflect.Value).Int())
+		}
+		sliceVal := reflect.MakeSlice(rtyp, sliceLen, sliceCap)
+		return Object{
+			Value: sliceVal,
+			Typ:   typ,
+			Sim:   sim,
+		}
+	default:
+		log.Fatal("make function called with unexpected type")
+	}
+	return Object{
+		Value: nil,
+		Typ:   typ,
+		Sim:   sim,
+	}
 }
