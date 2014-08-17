@@ -82,7 +82,14 @@ func (env *environ) evalMake(argExprs []ast.Expr) Object {
 			Sim:   sim,
 		}
 	case reflect.Map:
-		log.Fatal("make function for map types not implemented yet")
+		// We are forced to ignore a length if given, since the reflect package
+		// does not provide any way to specify it.
+		mapVal := reflect.MakeMap(rtyp)
+		return Object{
+			Value: mapVal,
+			Typ:   typ,
+			Sim:   sim,
+		}
 	case reflect.Slice:
 		args := env.evalFuncArgs(argExprs[1:])
 		sliceLen := int(args[0].Value.(reflect.Value).Int())

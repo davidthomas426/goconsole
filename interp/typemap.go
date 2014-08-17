@@ -65,6 +65,12 @@ func getReflectType(typeMap *typeutil.Map, typ types.Type) (reflect.Type, bool) 
 			if elem != nil {
 				return reflect.ChanOf(rdir, elem), false
 			}
+		case *types.Map:
+			key, _ := getReflectType(typeMap, typ.Key())
+			elem, _ := getReflectType(typeMap, typ.Elem())
+			if key != nil && elem != nil {
+				return reflect.MapOf(key, elem), false
+			}
 		}
 		return nil, false
 	}
