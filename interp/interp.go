@@ -116,7 +116,7 @@ func (i *interp) Run(src string) (bool, error) {
 		if errList, ok := err.(scanner.ErrorList); ok {
 			for j, err := range errList {
 				// Check if the error is at EOF or at a closing brace we added
-				if err.Pos.Offset >= fileSize-2 {
+				if err.Pos.Offset >= fileSize-1-len(i.stmtLists) {
 					// If this is the first error, it actually just means the source is incomplete,
 					// unless there is a superfluous '}' at the end of their code
 					if j == 0 && err.Msg != "expected declaration, found '}'" {
