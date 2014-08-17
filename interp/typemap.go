@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"log"
 	"reflect"
 
 	"code.google.com/p/go.tools/go/types"
@@ -20,6 +21,21 @@ func init() {
 	simFuncType = reflect.TypeOf(simFunc)
 }
 
+func getReflectDir(dir types.ChanDir) reflect.ChanDir {
+	var rdir reflect.ChanDir
+	switch dir {
+	case types.SendOnly:
+		rdir = reflect.SendDir
+	case types.RecvOnly:
+		rdir = reflect.RecvDir
+	case types.SendRecv:
+		rdir = reflect.BothDir
+	default:
+		log.Fatal("Unexpected channel direction")
+	}
+	return rdir
+}
+
 func getReflectType(typeMap *typeutil.Map, typ types.Type) (reflect.Type, bool) {
 	rt := typeMap.At(typ)
 	if rt == nil {
@@ -28,9 +44,26 @@ func getReflectType(typeMap *typeutil.Map, typ types.Type) (reflect.Type, bool) 
 		case *types.Signature:
 			return simFuncType, true
 		case *types.Pointer:
-			t, sim := getReflectType(typeMap, typ.Elem())
+			t, _ := getReflectType(typeMap, typ.Elem())
 			if t != nil {
-				return reflect.PtrTo(t), sim
+				return reflect.PtrTo(t), false
+			}
+		case *types.Slice:
+			elem, _ := getReflectType(typeMap, typ.Elem())
+			if elem != nil {
+				return reflect.SliceOf(elem), false
+			}
+		case *types.Array:
+			elem, _ := getReflectType(typeMap, typ.Elem())
+			if elem != nil {
+				return reflect.SliceOf(elem), true
+			}
+		case *types.Chan:
+			elem, _ := getReflectType(typeMap, typ.Elem())
+			dir := typ.Dir()
+			rdir := getReflectDir(dir)
+			if elem != nil {
+				return reflect.ChanOf(rdir, elem), false
 			}
 		}
 		return nil, false
