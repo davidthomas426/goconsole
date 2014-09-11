@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"code.google.com/p/go.tools/go/exact"
+	"code.google.com/p/go.tools/go/types"
 )
 
 func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
@@ -74,8 +75,15 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 			//   1) nil
 			//   2) Blank identifier
 			lhs := make([]Object, len(stmt.Lhs))
+			isMapIndexExpr := make([]bool, len(stmt.Lhs))
 			rhs := make([]reflect.Value, len(stmt.Lhs))
 			for i, expr := range stmt.Lhs {
+				if e, isIndexExpr := expr.(*ast.IndexExpr); isIndexExpr {
+					if _, isMap := env.info.TypeOf(e.X).Underlying().(*types.Map); isMap {
+						isMapIndexExpr[i] = true
+						continue
+					}
+				}
 				lhs[i] = env.Eval(expr)[0]
 			}
 			if len(stmt.Rhs) == 1 {
@@ -103,11 +111,31 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 			}
 
 			for i, obj := range lhs {
-				v := obj.Value.(reflect.Value)
-				if rhs[i].IsValid() {
-					v.Set(rhs[i])
+				if isMapIndexExpr[i] {
+					indexExpr := stmt.Lhs[i].(*ast.IndexExpr)
+					mapObj := env.Eval(indexExpr.X)[0]
+					keyObj := env.Eval(indexExpr.Index)[0]
+
+					mapVal := mapObj.Value.(reflect.Value)
+					keyVal := keyObj.Value.(reflect.Value)
+
+					if rhs[i].IsValid() {
+						mapVal.SetMapIndex(keyVal, rhs[i])
+					} else {
+						elemTyp := mapObj.Typ.(*types.Map).Elem()
+						rTyp, _ := getReflectType(env.interp.typeMap, elemTyp)
+						if rTyp == nil {
+							log.Fatal("Failed to obtain reflect.Type to represent type:", elemTyp)
+						}
+						mapVal.SetMapIndex(keyVal, reflect.Zero(rTyp))
+					}
 				} else {
-					v.Set(reflect.Zero(v.Type()))
+					v := obj.Value.(reflect.Value)
+					if rhs[i].IsValid() {
+						v.Set(rhs[i])
+					} else {
+						v.Set(reflect.Zero(v.Type()))
+					}
 				}
 			}
 		}
