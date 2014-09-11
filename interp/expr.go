@@ -220,6 +220,83 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		case callKind:
 			return env.evalFuncCall(e, false)
 		}
+	case *ast.IndexExpr:
+		resultTyp := env.info.TypeOf(e)
+		collTyp := env.info.TypeOf(e.X)
+
+		// Figure out which type of object we're indexing
+		objTyp := collTyp.Underlying()
+		switch objTyp := objTyp.(type) {
+		case *types.Array:
+			log.Fatal("Array indexing not implemented yet")
+		case *types.Map:
+			// TODO: Implement "comma-ok" logic
+			keyObj := env.Eval(e.Index)[0]
+			keyVal, ok := keyObj.Value.(reflect.Value)
+			if !ok {
+				// Must be untyped nil. Use zero value of type.
+				rtyp, _ := getReflectType(env.interp.typeMap, objTyp.Key())
+				keyVal = reflect.Zero(rtyp)
+			}
+			commaOk := false
+			var boolTyp types.Type
+			if tupleTyp, ok := resultTyp.(*types.Tuple); ok {
+				// "Comma-ok" map index expression
+				resultTyp = tupleTyp.At(0).Type()
+				boolTyp = tupleTyp.At(1).Type()
+				commaOk = true
+			}
+			rtyp, sim := getReflectType(env.interp.typeMap, resultTyp)
+			if rtyp == nil {
+				log.Fatal("Couldn't get reflect.Type of result type of map index expression")
+			}
+			mapObj := env.Eval(e.X)[0]
+			mapVal := mapObj.Value.(reflect.Value)
+			resultVal := mapVal.MapIndex(keyVal)
+			keyFound := true
+			if !resultVal.IsValid() {
+				// The key wasn't found in the map (including case where map is nil)
+				resultVal = reflect.Zero(rtyp)
+				keyFound = false
+			}
+			resultObj := Object{
+				Value: resultVal,
+				Typ:   resultTyp,
+				Sim:   sim,
+			}
+			if commaOk {
+				foundObj := Object{
+					Value: reflect.ValueOf(keyFound),
+					Typ:   boolTyp,
+					Sim:   false,
+				}
+				return []Object{resultObj, foundObj}
+			}
+			return []Object{resultObj}
+
+		case *types.Slice:
+			indObj := env.Eval(e.Index)[0]
+			ind := int(indObj.Value.(reflect.Value).Int())
+			sliceObj := env.Eval(e.X)[0]
+			sliceVal := sliceObj.Value.(reflect.Value)
+			resultVal := sliceVal.Index(ind)
+			rtyp, sim := getReflectType(env.interp.typeMap, resultTyp)
+			if rtyp == nil {
+				log.Fatal("Couldn't get reflect.Type of result type of slice index expression")
+			}
+			resultObj := Object{
+				Value: resultVal,
+				Typ:   resultTyp,
+				Sim:   sim,
+			}
+			return []Object{resultObj}
+		case *types.Basic:
+			log.Fatal("String indexing not implemented yet")
+		case *types.Pointer:
+			log.Fatal("Pointer-to-array indexing not implemented yet")
+		}
+
+		log.Fatalf("Unhandled expression type: %T", e)
 	default:
 		log.Fatalf("Unhandled expression type: %T", e)
 	}
