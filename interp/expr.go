@@ -146,6 +146,8 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			obj = operatorShiftRight(env, e.X, e.Y)
 		case token.SHL:
 			obj = operatorShiftLeft(env, e.X, e.Y)
+		case token.LSS:
+			obj = operatorLess(env, e.X, e.Y, e)
 		default:
 			// TODO: Implement other binary operators (comparisons, for example)
 			log.Fatalf("Binary operator %v not implemented yet", e.Op)

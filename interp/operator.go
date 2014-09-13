@@ -785,3 +785,57 @@ func operatorShiftLeft(env *environ, left, right ast.Expr) Object {
 		Typ:   newTyp,
 	}
 }
+
+// operatorLess implements the binary operation '<'.
+// If this is being called at all, then the left and right objects
+// have a value that's a "reflect.Value". Also, they can be compared,
+// since the expression passed type checking.
+func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
+	lo := env.Eval(left)[0]
+	ro := env.Eval(right)[0]
+
+	lo = getTypedObject(lo)
+	ro = getTypedObject(ro)
+	lv := lo.Value.(reflect.Value)
+	rv := ro.Value.(reflect.Value)
+
+	newTyp := env.info.TypeOf(binExpr)
+	less := false
+	switch lv.Kind() {
+	case reflect.Int:
+		less = int(lv.Int()) < int(rv.Int())
+	case reflect.Int8:
+		less = int8(lv.Int()) < int8(rv.Int())
+	case reflect.Int16:
+		less = int16(lv.Int()) < int16(rv.Int())
+	case reflect.Int32:
+		less = int32(lv.Int()) < int32(rv.Int())
+	case reflect.Int64:
+		less = int64(lv.Int()) < int64(rv.Int())
+	case reflect.Uint:
+		less = uint(lv.Uint()) < uint(rv.Uint())
+	case reflect.Uint8:
+		less = uint8(lv.Uint()) < uint8(rv.Uint())
+	case reflect.Uint16:
+		less = uint16(lv.Uint()) < uint16(rv.Uint())
+	case reflect.Uint32:
+		less = uint32(lv.Uint()) < uint32(rv.Uint())
+	case reflect.Uint64:
+		less = uint64(lv.Uint()) < uint64(rv.Uint())
+	case reflect.Uintptr:
+		less = uintptr(lv.Uint()) < uintptr(rv.Uint())
+	case reflect.Float32:
+		less = float32(lv.Float()) < float32(rv.Float())
+	case reflect.Float64:
+		less = float64(lv.Float()) < float64(rv.Float())
+	case reflect.String:
+		less = lv.String() < rv.String()
+	default:
+		panic("Type error: Invalid operands to ordered comparison: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+	}
+	newVal := reflect.ValueOf(less)
+	return Object{
+		Value: newVal,
+		Typ:   newTyp,
+	}
+}
