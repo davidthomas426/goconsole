@@ -121,7 +121,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			log.Fatalf("Unary operator %q not implemented", e.Op)
 		}
 	case *ast.BinaryExpr:
-		// This is oversimplified (what about && and || short-circuit eval?)
 		var obj Object
 		switch e.Op {
 		case token.ADD:
