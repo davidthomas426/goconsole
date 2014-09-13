@@ -173,6 +173,46 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 		chanVal := chanObj.Value.(reflect.Value)
 		sentVal := sentObj.Value.(reflect.Value)
 		chanVal.Send(sentVal)
+	case *ast.ForStmt:
+		// Set up scopes and environments
+		forScope := env.scope
+		forClauseEnv := env
+		if stmt.Init != nil {
+			forScope = env.info.Scopes[stmt]
+			forClauseEnv = &environ{
+				info:   env.info,
+				interp: env.interp,
+				scope:  forScope,
+				parent: env,
+				objs:   map[string]Object{},
+			}
+		}
+		blockScope := env.info.Scopes[stmt.Body]
+		blockEnv := &environ{
+			info:   env.info,
+			interp: env.interp,
+			scope:  blockScope,
+			parent: forClauseEnv,
+			objs:   map[string]Object{},
+		}
+
+		if stmt.Init != nil {
+			forClauseEnv.runStmt(stmt.Init, false)
+		}
+		for {
+			if stmt.Cond != nil {
+				if condObj := forClauseEnv.Eval(stmt.Cond)[0]; !condObj.Value.(reflect.Value).Bool() {
+					break
+				}
+			}
+			for _, stmt := range stmt.Body.List {
+				blockEnv.runStmt(stmt, false)
+			}
+			if stmt.Post != nil {
+				forClauseEnv.runStmt(stmt.Post, false)
+			}
+
+		}
 	default:
 		log.Fatalf("Unhandled statement type: %T", stmt)
 	}
