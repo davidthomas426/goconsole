@@ -74,65 +74,62 @@ func operatorAdd(env *environ, left, right ast.Expr) Object {
 	lv := lo.Value.(reflect.Value)
 	rv := ro.Value.(reflect.Value)
 
+	var newVal reflect.Value
 	newTyp := lo.Typ
-	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
-	if newRtyp == nil {
-		log.Fatal("operatorAdd: Couldn't get reflect.Type from types.Type")
-	}
-	newVal := reflect.New(newRtyp).Elem()
 
 	switch lv.Kind() {
 	case reflect.Int:
 		sum := int(lv.Int()) + int(rv.Int())
-		newVal.SetInt(int64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Int8:
 		sum := int8(lv.Int()) + int8(rv.Int())
-		newVal.SetInt(int64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Int16:
 		sum := int16(lv.Int()) + int16(rv.Int())
-		newVal.SetInt(int64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Int32:
 		sum := int32(lv.Int()) + int32(rv.Int())
-		newVal.SetInt(int64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Int64:
 		sum := int64(lv.Int()) + int64(rv.Int())
-		newVal.SetInt(int64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uint:
 		sum := uint(lv.Uint()) + uint(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uint8:
 		sum := uint8(lv.Uint()) + uint8(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uint16:
 		sum := uint16(lv.Uint()) + uint16(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uint32:
 		sum := uint32(lv.Uint()) + uint32(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uint64:
 		sum := uint64(lv.Uint()) + uint64(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Uintptr:
 		sum := uintptr(lv.Uint()) + uintptr(rv.Uint())
-		newVal.SetUint(uint64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Float32:
 		sum := float32(lv.Float()) + float32(rv.Float())
-		newVal.SetFloat(float64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Float64:
 		sum := float64(lv.Float()) + float64(rv.Float())
-		newVal.SetFloat(float64(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Complex64:
 		sum := complex64(lv.Complex()) + complex64(rv.Complex())
-		newVal.SetComplex(complex128(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.Complex128:
 		sum := complex128(lv.Complex()) + complex128(rv.Complex())
-		newVal.SetComplex(complex128(sum))
+		newVal = reflect.ValueOf(sum)
 	case reflect.String:
 		sum := lv.String() + rv.String()
-		newVal.SetString(sum)
+		newVal = reflect.ValueOf(sum)
 	default:
 		panic("Type error: Invalid operands to addition: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
 	}
+
 	return Object{
 		Value: newVal,
 		Typ:   newTyp,
