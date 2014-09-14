@@ -11,13 +11,41 @@ import (
 	"code.google.com/p/go.tools/go/types"
 )
 
-func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
+type stmtResult interface {
+	stmtResult() // Marker method
+}
+
+type returnResult []Object
+type breakResult string
+type continueResult string
+
+func (r returnResult) stmtResult()   {}
+func (r breakResult) stmtResult()    {}
+func (r continueResult) stmtResult() {}
+
+func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResult {
 	switch stmt := stmt.(type) {
 	case *ast.ReturnStmt:
 		if topLevel {
 			log.Fatal("Return from top-level not allowed")
 		}
-		log.Fatal("Return statements not implemented yet")
+		resObjs := env.evalExprs(stmt.Results)
+		return returnResult(resObjs)
+	case *ast.BranchStmt:
+		label := ""
+		if stmt.Label != nil {
+			label = stmt.Label.Name
+		}
+		switch stmt.Tok {
+		case token.BREAK:
+			return breakResult(label)
+		case token.CONTINUE:
+			return continueResult(label)
+		case token.GOTO:
+			log.Fatal("Goto statements not implemented")
+		case token.FALLTHROUGH:
+			log.Fatal("Fallthrough statements not implemented")
+		}
 	case *ast.AssignStmt:
 		switch stmt.Tok {
 		case token.DEFINE:
@@ -174,7 +202,7 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 		sentVal := sentObj.Value.(reflect.Value)
 		chanVal.Send(sentVal)
 	case *ast.ForStmt:
-		// Set up scopes and environments
+		// Set up scope and environment for the for statement
 		forScope := env.scope
 		forClauseEnv := env
 		if stmt.Init != nil {
@@ -186,34 +214,83 @@ func (env *environ) runStmt(stmt ast.Stmt, topLevel bool) {
 				parent: env,
 				objs:   map[string]Object{},
 			}
+			forClauseEnv.runStmt(stmt.Init, "", false)
 		}
-		blockScope := env.info.Scopes[stmt.Body]
+		for {
+			if stmt.Cond != nil {
+				condObj := forClauseEnv.Eval(stmt.Cond)[0]
+				if !condObj.Value.(reflect.Value).Bool() {
+					break
+				}
+			}
+			if stmtRes := forClauseEnv.runStmt(stmt.Body, "", false); stmtRes != nil {
+				switch stmtRes := stmtRes.(type) {
+				case breakResult:
+					if string(stmtRes) == "" || string(stmtRes) == label {
+						return nil
+					}
+				case continueResult:
+					if string(stmtRes) == "" || string(stmtRes) == label {
+						if stmt.Post != nil {
+							forClauseEnv.runStmt(stmt.Post, "", false)
+						}
+						continue
+					}
+				}
+				return stmtRes
+			}
+			if stmt.Post != nil {
+				forClauseEnv.runStmt(stmt.Post, "", false)
+			}
+		}
+	case *ast.IfStmt:
+		// Set up scope and environment for the for statement
+		ifScope := env.scope
+		ifClauseEnv := env
+		if stmt.Init != nil {
+			ifScope = env.info.Scopes[stmt]
+			ifClauseEnv = &environ{
+				info:   env.info,
+				interp: env.interp,
+				scope:  ifScope,
+				parent: env,
+				objs:   map[string]Object{},
+			}
+			ifClauseEnv.runStmt(stmt.Init, "", false)
+		}
+		var stmtRes stmtResult
+		condObj := ifClauseEnv.Eval(stmt.Cond)[0]
+		cond := false
+		if condVal, ok := condObj.Value.(reflect.Value); ok {
+			cond = condVal.Bool()
+		} else {
+			ev := condObj.Value.(exact.Value)
+			cond = exact.BoolVal(ev)
+		}
+		if cond {
+			stmtRes = ifClauseEnv.runStmt(stmt.Body, "", false)
+		} else {
+			if stmt.Else != nil {
+				stmtRes = ifClauseEnv.runStmt(stmt.Else, "", false)
+			}
+		}
+		return stmtRes
+	case *ast.BlockStmt:
+		blockScope := env.info.Scopes[stmt]
 		blockEnv := &environ{
 			info:   env.info,
 			interp: env.interp,
 			scope:  blockScope,
-			parent: forClauseEnv,
+			parent: env,
 			objs:   map[string]Object{},
 		}
-
-		if stmt.Init != nil {
-			forClauseEnv.runStmt(stmt.Init, false)
-		}
-		for {
-			if stmt.Cond != nil {
-				if condObj := forClauseEnv.Eval(stmt.Cond)[0]; !condObj.Value.(reflect.Value).Bool() {
-					break
-				}
+		for _, st := range stmt.List {
+			if stmtRes := blockEnv.runStmt(st, "", false); stmtRes != nil {
+				return stmtRes
 			}
-			for _, stmt := range stmt.Body.List {
-				blockEnv.runStmt(stmt, false)
-			}
-			if stmt.Post != nil {
-				forClauseEnv.runStmt(stmt.Post, false)
-			}
-
 		}
 	default:
 		log.Fatalf("Unhandled statement type: %T", stmt)
 	}
+	return nil
 }

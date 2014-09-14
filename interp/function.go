@@ -27,7 +27,6 @@ func getObjectOfType(typeMap *typeutil.Map, typ types.Type) Object {
 }
 
 func createUnsimulatedFunc(env *environ, funcLit *ast.FuncLit, rtyp reflect.Type) reflect.Value {
-	stmtList := funcLit.Body.List
 	funcType := env.info.Types[funcLit].Type.(*types.Signature)
 	funcScope := env.info.Scopes[funcLit.Type]
 	funcParams := funcType.Params()
@@ -80,37 +79,20 @@ func createUnsimulatedFunc(env *environ, funcLit *ast.FuncLit, rtyp reflect.Type
 
 		}
 
-		// TODO: The rest of this function is unfinished, still copied from createSimulatedFunc!
-		// 4) Evaluate each statement in the statement list (topLevel=false)
-		//     Note: If stmt is return statment, handle it especially
-		//           a) bare "return" - just return (since we've set up our result slice already)
-		//           b) return with values - assign values to results, then return
-		for _, stmt := range stmtList {
-			if retStmt, ok := stmt.(*ast.ReturnStmt); ok {
-				// TODO: what about results? (see note above)
-				numRes := len(retStmt.Results)
-				if numRes == 1 {
-					resVals := funcEnv.Eval(retStmt.Results[0])
-					for i, resVal := range resVals {
-						assignObj(resultObjs[i], resVal)
-					}
-				} else if numRes > 1 {
-					for i, resExpr := range retStmt.Results {
-						assignObj(resultObjs[i], funcEnv.Eval(resExpr)[0])
-					}
-				}
-				return
+		// 4) Evaluate the body of the function (topLevel=false)
+		//     Note: If results are returned, handle them
+		stmtRes := funcEnv.runStmt(funcLit.Body, "", false)
+		if res, ok := stmtRes.(returnResult); ok {
+			for i, resObj := range res {
+				assignObj(resultObjs[i], resObj)
 			}
-			funcEnv.runStmt(stmt, false)
 		}
-		// The code for the function did not contain an explicit return statement, so we still need to return.
 		return
 	}
 	return reflect.MakeFunc(rtyp, funcVal)
 }
 
 func createSimulatedFunc(env *environ, funcLit *ast.FuncLit) func([]Object) []Object {
-	stmtList := funcLit.Body.List
 	funcType := env.info.Types[funcLit].Type.(*types.Signature)
 	funcScope := env.info.Scopes[funcLit.Type]
 	funcParams := funcType.Params()
@@ -157,31 +139,14 @@ func createSimulatedFunc(env *environ, funcLit *ast.FuncLit) func([]Object) []Ob
 			}
 		}
 
-		// 4) Evaluate each statement in the statement list (topLevel=false)
-		//     Note: If stmt is return statment, handle it especially
-		//           a) bare "return" - just return (since we've set up our result slice already)
-		//           b) return with values - assign values to results, then return
-		for _, stmt := range stmtList {
-			if retStmt, ok := stmt.(*ast.ReturnStmt); ok {
-				// TODO: what about results? (see note above)
-				numRes := len(retStmt.Results)
-				if numRes == 1 {
-					resVals := funcEnv.Eval(retStmt.Results[0])
-					for i, resVal := range resVals {
-						assignObj(results[i], resVal)
-					}
-				} else if numRes > 1 {
-					for i, resExpr := range retStmt.Results {
-						// TODO: Is this right? Don't we need to assign it and set the
-						// right type?
-						assignObj(results[i], funcEnv.Eval(resExpr)[0])
-					}
-				}
-				return
+		// 4) Evaluate the body of the function (topLevel=false)
+		//     Note: If results are returned, handle them
+		stmtRes := funcEnv.runStmt(funcLit.Body, "", false)
+		if res, ok := stmtRes.(returnResult); ok {
+			for i, resObj := range res {
+				assignObj(results[i], resObj)
 			}
-			funcEnv.runStmt(stmt, false)
 		}
-		// The code for the function did not contain an explicit return statement, so we still need to return.
 		return
 	}
 }

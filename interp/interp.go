@@ -186,7 +186,10 @@ func (i *interp) Run(src string) (bool, error) {
 
 	// Run each statement in the list
 	for _, stmt := range stmtList {
-		i.topEnv.runStmt(stmt, true)
+		stmtRes := i.topEnv.runStmt(stmt, "", true)
+		if stmtRes != nil {
+			log.Fatal("return from top level not allowed")
+		}
 	}
 
 	// Add current input to the stmtLists slice for next time
