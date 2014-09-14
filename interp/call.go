@@ -49,18 +49,7 @@ func (env *environ) getCallExprKind(callExpr *ast.CallExpr) callExprKind {
 }
 
 func (env *environ) evalFuncArgs(argExprs []ast.Expr) []Object {
-	var args []Object
-	if len(args) == 1 {
-		// Single argument expression, potentially multi-valued
-		args = env.Eval(argExprs[0])
-	} else {
-		// Multiple argument expressions, each single-valued
-		args = make([]Object, len(argExprs))
-		for i, argExpr := range argExprs {
-			args[i] = env.Eval(argExpr)[0]
-		}
-	}
-	return args
+	return env.evalExprs(argExprs)
 }
 
 // callFunWithObjs calls the given function on the arguments given as a slice of Object.

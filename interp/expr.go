@@ -11,6 +11,21 @@ import (
 	"code.google.com/p/go.tools/go/types/typeutil"
 )
 
+func (env *environ) evalExprs(exprs []ast.Expr) []Object {
+	var objs []Object
+	if len(objs) == 1 {
+		// Single argument expression, potentially multi-valued
+		objs = env.Eval(exprs[0])
+	} else {
+		// Multiple argument expressions, each single-valued
+		objs = make([]Object, len(exprs))
+		for i, expr := range exprs {
+			objs[i] = env.Eval(expr)[0]
+		}
+	}
+	return objs
+}
+
 func (env *environ) Eval(expr ast.Expr) []Object {
 	// Check for constant
 	tv := env.info.Types[expr]
