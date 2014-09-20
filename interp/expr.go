@@ -162,6 +162,12 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			obj = operatorShiftLeft(env, e.X, e.Y)
 		case token.LSS:
 			obj = operatorLess(env, e.X, e.Y, e)
+		case token.GTR:
+			obj = operatorGreater(env, e.X, e.Y, e)
+		case token.LEQ:
+			obj = operatorLessEqual(env, e.X, e.Y, e)
+		case token.GEQ:
+			obj = operatorGreaterEqual(env, e.X, e.Y, e)
 		default:
 			// TODO: Implement other binary operators (comparisons, for example)
 			log.Fatalf("Binary operator %v not implemented yet", e.Op)

@@ -138,6 +138,7 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 				}
 			}
 
+			// Set the lhs objects' values with results of rhs expressions
 			for i, obj := range lhs {
 				if isMapIndexExpr[i] {
 					indexExpr := stmt.Lhs[i].(*ast.IndexExpr)
@@ -150,6 +151,7 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 					if rhs[i].IsValid() {
 						mapVal.SetMapIndex(keyVal, rhs[i])
 					} else {
+						// Must be untyped nil
 						elemTyp := mapObj.Typ.(*types.Map).Elem()
 						rTyp, _ := getReflectType(env.interp.typeMap, elemTyp)
 						if rTyp == nil {
@@ -162,6 +164,7 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 					if rhs[i].IsValid() {
 						v.Set(rhs[i])
 					} else {
+						// Must be untyped nil
 						v.Set(reflect.Zero(v.Type()))
 					}
 				}
