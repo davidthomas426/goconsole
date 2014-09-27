@@ -9,12 +9,6 @@ import (
 	"code.google.com/p/go.tools/go/types/typeutil"
 )
 
-func assignObj(obj Object, other Object) {
-	// Panics if either obj.value or other.value is not a reflect.Value, or
-	// if obj.value is not settable!
-	obj.Value.(reflect.Value).Set(other.Value.(reflect.Value))
-}
-
 // Assumes we want an Object wrapping a settable reflect.Value with the zero value
 func getObjectOfType(typeMap *typeutil.Map, typ types.Type) Object {
 	rtyp, sim := getReflectType(typeMap, typ)

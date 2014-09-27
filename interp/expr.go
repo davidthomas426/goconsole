@@ -13,7 +13,7 @@ import (
 
 func (env *environ) evalExprs(exprs []ast.Expr) []Object {
 	var objs []Object
-	if len(objs) == 1 {
+	if len(exprs) == 1 {
 		// Single argument expression, potentially multi-valued
 		objs = env.Eval(exprs[0])
 	} else {
@@ -24,6 +24,15 @@ func (env *environ) evalExprs(exprs []ast.Expr) []Object {
 		}
 	}
 	return objs
+}
+
+func isMapIndexExpr(env *environ, expr ast.Expr) bool {
+	if e, isIndexExpr := expr.(*ast.IndexExpr); isIndexExpr {
+		if _, isMap := env.info.TypeOf(e.X).Underlying().(*types.Map); isMap {
+			return true
+		}
+	}
+	return false
 }
 
 func (env *environ) Eval(expr ast.Expr) []Object {
