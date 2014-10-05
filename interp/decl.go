@@ -11,8 +11,7 @@ func getSettableZeroVal(typ reflect.Type) reflect.Value {
 		return reflect.New(typ).Elem()
 	}
 	log.Fatal("getSettableZeroVal: array types not implemented yet")
-	var empty reflect.Value
-	return empty
+	return reflect.Value{}
 }
 
 func (env *environ) getDeclVars(exprs []ast.Expr) []Object {
