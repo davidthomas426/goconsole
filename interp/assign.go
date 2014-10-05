@@ -30,10 +30,10 @@ func (env *environ) getAssignmentLhs(exprs []ast.Expr) ([]Object, map[int]bool) 
 // rObj.Value must be a reflect.Value unless it represents untyped nil.
 func assignObj(lObj, rObj Object) {
 	lVal := lObj.Value.(reflect.Value)
-	rVal, ok := rObj.Value.(reflect.Value)
-	if ok {
+	switch rVal := rObj.Value.(type) {
+	case reflect.Value:
 		lVal.Set(rVal)
-	} else {
+	default:
 		// Must be untyped nil
 		lVal.Set(reflect.Zero(lVal.Type()))
 	}
