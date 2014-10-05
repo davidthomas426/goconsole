@@ -22,7 +22,8 @@ func (env *environ) evalBuiltinCall(callExpr *ast.CallExpr, async bool) []Object
 	case "cap":
 		log.Fatal("cap function not implemented yet")
 	case "close":
-		log.Fatal("close function not implemented yet")
+		argObj := env.evalFuncArgs(callExpr.Args)[0]
+		argObj.Value.(reflect.Value).Close()
 	case "complex":
 		log.Fatal("complex function not implemented yet")
 	case "len":
