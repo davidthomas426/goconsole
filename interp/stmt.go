@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"code.google.com/p/go.tools/go/exact"
+	"code.google.com/p/go.tools/go/types"
 )
 
 type stmtResult interface {
@@ -176,6 +177,68 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 			}
 		}
 		return stmtRes
+	case *ast.SelectStmt:
+		// Need to set up data structures to pass to env.runSelect
+		clauses := stmt.Body.List
+		cases := make([]reflect.SelectCase, len(clauses))
+		ctxs := make([]selectCaseContext, len(clauses))
+		for i, clause := range clauses {
+			clause := clause.(*ast.CommClause)
+			ctxs[i].stmts = clause.Body
+			switch commStmt := clause.Comm.(type) {
+			case nil:
+				cases[i].Dir = reflect.SelectDefault
+			case *ast.SendStmt:
+				cases[i].Dir = reflect.SelectSend
+				chanObj := env.Eval(commStmt.Chan)[0]
+				sendObj := env.Eval(commStmt.Value)[0]
+				cases[i].Chan = chanObj.Value.(reflect.Value)
+				switch sendVal := sendObj.Value.(type) {
+				case reflect.Value:
+					cases[i].Send = sendVal
+				default:
+					// Must be untyped nil
+					fmt.Println("sent untyped nil")
+					elemTyp := chanObj.Typ.Underlying().(*types.Chan).Elem()
+					rTyp, _ := getReflectType(env.interp.typeMap, elemTyp)
+					if rTyp == nil {
+						log.Fatal("Failed to obtain reflect.Type to represent type:", elemTyp)
+					}
+					cases[i].Send = reflect.Zero(rTyp)
+				}
+			default:
+				cases[i].Dir = reflect.SelectRecv
+
+				// Extract the recv expression and set lhs and tok in the context if applicable.
+				var recvExpr ast.Expr
+				switch stmt := commStmt.(type) {
+				case *ast.ExprStmt:
+					recvExpr = stmt.X
+				case *ast.AssignStmt:
+					ctxs[i].lhs = stmt.Lhs
+					ctxs[i].tok = stmt.Tok
+					recvExpr = stmt.Rhs[0] // Must only be one, from spec
+				}
+				// Drill down into paren exprs
+			removeParens:
+				for {
+					switch expr := recvExpr.(type) {
+					case *ast.ParenExpr:
+						// Remove parens
+						recvExpr = expr.X
+					default:
+						// If it's not a ParenExpr, we're done
+						break removeParens
+					}
+				}
+
+				// Evaluate the channel operand of the receive expression
+				chanExpr := recvExpr.(*ast.UnaryExpr).X
+				chanObj := env.Eval(chanExpr)[0]
+				cases[i].Chan = chanObj.Value.(reflect.Value)
+			}
+		}
+		env.runSelect(clauses, cases, ctxs)
 	case *ast.BlockStmt:
 		blockScope := env.info.Scopes[stmt]
 		blockEnv := &environ{
