@@ -65,6 +65,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		return []Object{obj}
 	}
 	// Not a constant expression, so we have to evaluate it ourselves
+	typ := tv.Type
 	switch e := expr.(type) {
 	case *ast.FuncLit:
 		// TODO: Simulated functions, to interact with each other correctly inside the
@@ -79,7 +80,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		// sure that this guarantee holds.
 
 		// TODO: avoid simulating function types when possible
-		typ := env.info.Types[e].Type
 		rtyp, sim := getReflectType(env.interp.typeMap, typ)
 		if sim {
 			// We must simulate the function type we want to create
@@ -110,7 +110,6 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			// Nil pointer dereference!
 			panic("goconsole: Nil pointer dereference")
 		}
-		typ := env.info.Types[expr].Type
 		obj := Object{
 			Value: newVal,
 			Typ:   typ,
@@ -123,24 +122,39 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			xObj := env.Eval(e.X)[0]
 			xVal := xObj.Value.(reflect.Value)
 			newVal := xVal.Addr()
-			typ := env.info.Types[expr].Type
 			obj := Object{
 				Value: newVal,
 				Typ:   typ,
 			}
 			return []Object{obj}
 		case token.ARROW:
-			// TODO: Currently only handles version with single return
-			// TODO: Doesn't currently handle channels of simulated type
 			xObj := env.Eval(e.X)[0]
 			xVal := xObj.Value.(reflect.Value)
-			newVal, _ := xVal.Recv()
-			typ := env.info.Types[expr].Type
-			obj := Object{
-				Value: newVal,
-				Typ:   typ,
+			var valTyp types.Type
+			commaOk := false
+			switch tup := typ.(type) {
+			case *types.Tuple:
+				valTyp = tup.At(0).Type()
+				commaOk = true
+			default:
+				valTyp = typ
 			}
-			return []Object{obj}
+			newVal, ok := xVal.Recv()
+			_, sim := getReflectType(env.interp.typeMap, typ)
+			valObj := Object{
+				Value: newVal,
+				Typ:   valTyp,
+				Sim:   sim,
+			}
+			if commaOk {
+				okObj := Object{
+					Value: reflect.ValueOf(ok),
+					Typ:   types.Typ[types.Bool],
+					Sim:   false,
+				}
+				return []Object{valObj, okObj}
+			}
+			return []Object{valObj}
 		default:
 			log.Fatalf("Unary operator %q not implemented", e.Op)
 		}
@@ -223,7 +237,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			return env.evalBuiltinCall(e, false)
 		case conversionKind:
 			// Get the type we're converting to
-			typ := env.info.Types[e.Fun].Type
+			typ := env.info.TypeOf(e.Fun)
 			rtyp, sim := getReflectType(env.interp.typeMap, typ)
 			if rtyp == nil {
 				log.Fatal("Failed to obtain reflect.Type to represent type:", typ)
@@ -252,7 +266,7 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			return env.evalFuncCall(e, false)
 		}
 	case *ast.IndexExpr:
-		resultTyp := env.info.TypeOf(e)
+		resultTyp := typ
 		collTyp := env.info.TypeOf(e.X)
 
 		// Figure out which type of object we're indexing
