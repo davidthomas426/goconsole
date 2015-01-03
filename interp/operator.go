@@ -74,58 +74,62 @@ func operatorAdd(env *environ, left, right ast.Expr) Object {
 	lv := lo.Value.(reflect.Value)
 	rv := ro.Value.(reflect.Value)
 
-	var newVal reflect.Value
 	newTyp := lo.Typ
+	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+	if newRtyp == nil {
+		log.Fatal("operatorAdd: Couldn't get reflect.Type from types.Type")
+	}
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
 		sum := int(lv.Int()) + int(rv.Int())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetInt(int64(sum))
 	case reflect.Int8:
 		sum := int8(lv.Int()) + int8(rv.Int())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetInt(int64(sum))
 	case reflect.Int16:
 		sum := int16(lv.Int()) + int16(rv.Int())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetInt(int64(sum))
 	case reflect.Int32:
 		sum := int32(lv.Int()) + int32(rv.Int())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetInt(int64(sum))
 	case reflect.Int64:
 		sum := int64(lv.Int()) + int64(rv.Int())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetInt(int64(sum))
 	case reflect.Uint:
 		sum := uint(lv.Uint()) + uint(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Uint8:
 		sum := uint8(lv.Uint()) + uint8(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Uint16:
 		sum := uint16(lv.Uint()) + uint16(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Uint32:
 		sum := uint32(lv.Uint()) + uint32(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Uint64:
 		sum := uint64(lv.Uint()) + uint64(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Uintptr:
 		sum := uintptr(lv.Uint()) + uintptr(rv.Uint())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetUint(uint64(sum))
 	case reflect.Float32:
 		sum := float32(lv.Float()) + float32(rv.Float())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetFloat(float64(sum))
 	case reflect.Float64:
 		sum := float64(lv.Float()) + float64(rv.Float())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetFloat(float64(sum))
 	case reflect.Complex64:
 		sum := complex64(lv.Complex()) + complex64(rv.Complex())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetComplex(complex128(sum))
 	case reflect.Complex128:
 		sum := complex128(lv.Complex()) + complex128(rv.Complex())
-		newVal = reflect.ValueOf(sum)
+		newVal.SetComplex(complex128(sum))
 	case reflect.String:
 		sum := lv.String() + rv.String()
-		newVal = reflect.ValueOf(sum)
+		newVal.SetString(sum)
 	default:
 		panic("Type error: Invalid operands to addition: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
 	}
@@ -151,7 +155,7 @@ func operatorSubtract(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorSubtract: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -223,7 +227,7 @@ func operatorMultiply(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorMultiply: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -295,7 +299,7 @@ func operatorQuotient(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorQuotient: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -367,7 +371,7 @@ func operatorRemainder(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorRemainder: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -427,7 +431,7 @@ func operatorAnd(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorAnd: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -487,7 +491,7 @@ func operatorOr(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorOr: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -547,7 +551,7 @@ func operatorXor(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorXor: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -607,7 +611,7 @@ func operatorAndNot(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorAndNot: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -674,7 +678,7 @@ func operatorShiftRight(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorShiftRight: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -741,7 +745,7 @@ func operatorShiftLeft(env *environ, left, right ast.Expr) Object {
 	if newRtyp == nil {
 		log.Fatal("operatorShiftLeft: Couldn't get reflect.Type from types.Type")
 	}
-	newVal := reflect.New(newRtyp).Elem()
+	newVal := getSettableZeroVal(newRtyp)
 
 	switch lv.Kind() {
 	case reflect.Int:
@@ -818,7 +822,7 @@ func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
 		if newRtyp == nil {
 			log.Fatal("operatorLess: Couldn't get reflect.Type from types.Type")
 		}
-		newVal = reflect.New(newRtyp).Elem()
+		newVal = getSettableZeroVal(newRtyp)
 		newVal.SetBool(less)
 	} else {
 		// Type is "bool" or "untyped bool". Use "bool".

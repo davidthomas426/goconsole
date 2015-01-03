@@ -275,12 +275,14 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		case *types.Array:
 			log.Fatal("Array indexing not implemented yet")
 		case *types.Map:
-			// TODO: Implement "comma-ok" logic
 			keyObj := env.Eval(e.Index)[0]
 			keyVal, ok := keyObj.Value.(reflect.Value)
 			if !ok {
 				// Must be untyped nil. Use zero value of type.
 				rtyp, _ := getReflectType(env.interp.typeMap, objTyp.Key())
+				if rtyp == nil {
+					log.Fatalf("couldn't get reflect.Type corresponding to %q", objTyp)
+				}
 				keyVal = reflect.Zero(rtyp)
 			}
 			commaOk := false

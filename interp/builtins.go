@@ -57,6 +57,8 @@ func (env *environ) evalBuiltinCall(callExpr *ast.CallExpr, async bool) []Object
 		log.Fatal("real function not implemented yet")
 	case "recover":
 		log.Fatal("recover function not implemented yet")
+	default:
+		log.Fatalf("builtin function %s not implemented yet", builtinName)
 	}
 	return results
 }

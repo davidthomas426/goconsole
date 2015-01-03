@@ -27,6 +27,9 @@ func (env *environ) getDeclVars(exprs []ast.Expr) []Object {
 			// New variable declaration. Create new variable with the right type.
 			typ := env.info.TypeOf(expr)
 			rtyp, sim := getReflectType(env.interp.typeMap, typ)
+			if rtyp == nil {
+				log.Fatalf("couldn't get reflect.Type corresponding to %q", typ)
+			}
 			val := getSettableZeroVal(rtyp)
 			obj := Object{
 				Value: val,
