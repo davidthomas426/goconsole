@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	"code.google.com/p/go.tools/go/types"
+	"golang.org/x/tools/go/types"
 )
 
 type environ struct {
@@ -59,7 +59,7 @@ func (env *environ) addVar(varInfo *types.Var, typ reflect.Type, obj Object) {
 func (env *environ) dumpScope() (string, int) {
 	lines := []string{}
 	for _, name := range env.names {
-		t := env.scope.LookupParent(name)
+		_, t := env.scope.LookupParent(name)
 		switch t.(type) {
 		case *types.Var:
 			lines = append(lines, "var "+name+" "+TypeString(t.Type()))

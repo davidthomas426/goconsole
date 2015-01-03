@@ -11,9 +11,9 @@ import (
 
 	"github.com/davidthomas426/goconsole/interp"
 
-	_ "code.google.com/p/go.tools/go/gcimporter"
-	"code.google.com/p/go.tools/go/types"
-	"code.google.com/p/go.tools/go/types/typeutil"
+	_ "golang.org/x/tools/go/gcimporter"
+	"golang.org/x/tools/go/types"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 type Import struct {
@@ -59,13 +59,13 @@ var typeMap = new(typeutil.Map)
 
 func main() {
 	importSet := map[Import]bool{
-		Import{Path: "bufio"}:                                      true,
-		Import{Path: "fmt"}:                                        true,
-		Import{Path: "github.com/davidthomas426/goconsole/interp"}: true,
-		Import{Path: "os"}:                                         true,
-		Import{LocalName: "_", Path: "code.google.com/p/go.tools/go/gcimporter"}: true,
-		Import{Path: "code.google.com/p/go.tools/go/types"}:                      true,
-		Import{Path: "code.google.com/p/go.tools/go/types/typeutil"}:             true,
+		Import{Path: "bufio"}:                                            true,
+		Import{Path: "fmt"}:                                              true,
+		Import{Path: "github.com/davidthomas426/goconsole/interp"}:       true,
+		Import{Path: "os"}:                                               true,
+		Import{LocalName: "_", Path: "golang.org/x/tools/go/gcimporter"}: true,
+		Import{Path: "golang.org/x/tools/go/types"}:                      true,
+		Import{Path: "golang.org/x/tools/go/types/typeutil"}:             true,
 	}
 
 	if len(os.Args) >= 2 {
@@ -73,7 +73,6 @@ func main() {
 		importSet[Import{Path: "log"}] = true
 		importSet[Import{Path: "reflect"}] = true
 	}
-
 
 	pkgNames := make(map[string]bool)
 
@@ -175,7 +174,7 @@ func addType(pkg *Package, typ types.Type, checkerTypeStr string, reflectTypeStr
 }
 
 func processType(pkg *Package, typ types.Type, checkerTypeStr string, reflectTypeStr string,
-							useReflectString bool, pkgNames map[string]bool) {
+	useReflectString bool, pkgNames map[string]bool) {
 	if visitedType(typ) {
 		return
 	}
@@ -271,7 +270,7 @@ func processType(pkg *Package, typ types.Type, checkerTypeStr string, reflectTyp
 			if f.Exported() {
 				ft := undTyp.Field(i).Type()
 				fcts := fmt.Sprintf("t%d.Underlying().(*types.Struct).Field(%d).Type()", index, i)
-				frts := fmt.Sprintf("rt%d.Field(%d).Type", index, i)  // TODO: FIX THIS LINE
+				frts := fmt.Sprintf("rt%d.Field(%d).Type", index, i) // TODO: FIX THIS LINE
 				processType(pkg, ft, fcts, frts, true, pkgNames)
 			}
 		}

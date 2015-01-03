@@ -6,9 +6,9 @@ import (
 	"log"
 	"reflect"
 
-	"code.google.com/p/go.tools/go/exact"
-	"code.google.com/p/go.tools/go/types"
-	"code.google.com/p/go.tools/go/types/typeutil"
+	"golang.org/x/tools/go/exact"
+	"golang.org/x/tools/go/types"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 func (env *environ) evalExprs(exprs []ast.Expr) []Object {

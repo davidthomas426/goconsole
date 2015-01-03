@@ -5,8 +5,8 @@ import (
 	"go/token"
 	"reflect"
 
-	"code.google.com/p/go.tools/go/types"
-	"code.google.com/p/go.tools/go/types/typeutil"
+	"golang.org/x/tools/go/types"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 // Assumes we want an Object wrapping a settable reflect.Value with the zero value

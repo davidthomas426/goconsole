@@ -5,7 +5,7 @@ import (
 	"log"
 	"reflect"
 
-	"code.google.com/p/go.tools/go/types"
+	"golang.org/x/tools/go/types"
 )
 
 // TODO: this only covers very simple assignment. There are more complicated rules
