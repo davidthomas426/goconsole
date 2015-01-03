@@ -11,6 +11,8 @@ import (
 
 	"github.com/davidthomas426/goconsole/interp"
 
+	_ "github.com/peterh/liner"
+
 	_ "golang.org/x/tools/go/gcimporter"
 	"golang.org/x/tools/go/types"
 	"golang.org/x/tools/go/types/typeutil"
@@ -59,10 +61,9 @@ var typeMap = new(typeutil.Map)
 
 func main() {
 	importSet := map[Import]bool{
-		Import{Path: "bufio"}:                                            true,
 		Import{Path: "fmt"}:                                              true,
 		Import{Path: "github.com/davidthomas426/goconsole/interp"}:       true,
-		Import{Path: "os"}:                                               true,
+		Import{Path: "github.com/peterh/liner"}:                          true,
 		Import{LocalName: "_", Path: "golang.org/x/tools/go/gcimporter"}: true,
 		Import{Path: "golang.org/x/tools/go/types"}:                      true,
 		Import{Path: "golang.org/x/tools/go/types/typeutil"}:             true,
@@ -450,20 +451,25 @@ func main() {
 {{end}}
 
 	interp := interp.NewInterpreter(pkgs, pkgMap, typeMap)
-	scan := bufio.NewScanner(os.Stdin)
-	fmt.Print(">>> ")
-	for scan.Scan() {
-		src := scan.Text()
+	line := liner.NewLiner()
+	defer line.Close()
+
+	src, lerr := line.Prompt(">>> ")
+	for lerr == nil {
 		incomplete, err := interp.Run(src)
 		if err != nil {
 			fmt.Println(err)
+			break
+		}
+		if src != "" {
+			line.AppendHistory(src)
 		}
 		if incomplete {
-			fmt.Print("... ")
+			src, lerr = line.Prompt("... ")
 		} else {
-			fmt.Print(">>> ")
+			src, lerr = line.Prompt(">>> ")
 		}
 	}
-	fmt.Println()
+	fmt.Println(lerr)
 }
 `
