@@ -6,12 +6,14 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"sync"
 	"text/template"
 
 	"github.com/davidthomas426/goconsole/interp"
 
-	_ "github.com/peterh/liner"
+	"github.com/peterh/liner"
 
 	_ "golang.org/x/tools/go/gcimporter"
 	"golang.org/x/tools/go/types"
@@ -60,7 +62,16 @@ func (p *Package) AddType(typ types.Type, t Type) {
 var typeMap = new(typeutil.Map)
 
 func main() {
+	var cmdError error
+	defer func() {
+		fmt.Println()
+		if cmdError != nil {
+			propagateError(cmdError)
+		}
+	}()
+
 	importSet := map[Import]bool{
+		Import{Path: "os"}:                                               true,
 		Import{Path: "fmt"}:                                              true,
 		Import{Path: "github.com/davidthomas426/goconsole/interp"}:       true,
 		Import{Path: "github.com/peterh/liner"}:                          true,
@@ -142,11 +153,30 @@ func main() {
 
 	srcFile.Close()
 
+	// Grab the terminal mode and reset it on exit interrupt signal, just in case
+	mode, err := liner.TerminalMode()
+	if err != nil {
+		log.Panic(err)
+	}
+	var once sync.Once
+	resetTerminal := func() {
+		mode.ApplyMode()
+	}
+
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		<-c
+		once.Do(resetTerminal)
+	}()
+
+	defer once.Do(resetTerminal)
+
 	cmd := exec.Command("go", "run", fn)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	cmd.Run()
+	cmdError = cmd.Run()
 }
 
 func processObj(pkg *Package, obj types.Object, pkgNames map[string]bool) {
@@ -451,8 +481,18 @@ func main() {
 {{end}}
 
 	interp := interp.NewInterpreter(pkgs, pkgMap, typeMap)
+
+	var lerr error
+	defer func() {
+		if lerr == liner.ErrPromptAborted {
+			os.Exit(2)
+		}
+	}()
+
 	line := liner.NewLiner()
 	defer line.Close()
+
+	line.SetCtrlCAborts(true)
 
 	src, lerr := line.Prompt(">>> ")
 	for lerr == nil {
@@ -470,6 +510,5 @@ func main() {
 			src, lerr = line.Prompt(">>> ")
 		}
 	}
-	fmt.Println(lerr)
 }
 `
