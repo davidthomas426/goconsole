@@ -66,7 +66,7 @@ func main() {
 	defer func() {
 		fmt.Println()
 		if cmdError != nil {
-			propagateError(cmdError)
+			os.Exit(1)
 		}
 	}()
 
