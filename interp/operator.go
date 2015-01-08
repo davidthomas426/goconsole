@@ -964,13 +964,82 @@ func operatorGreaterEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) 
 		// Type is not "bool" but some other named boolean type.
 		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 		if newRtyp == nil {
-			log.Fatal("operatorLessEqual: Couldn't get reflect.Type from types.Type")
+			log.Fatal("operatorGreaterEqual: Couldn't get reflect.Type from types.Type")
 		}
 		newVal = reflect.New(newRtyp).Elem()
 		newVal.SetBool(less)
 	} else {
 		// Type is "bool" or "untyped bool". Use "bool".
 		newVal = reflect.ValueOf(less)
+	}
+
+	return Object{
+		Value: newVal,
+		Typ:   newTyp,
+	}
+}
+
+// operatorGreaterEqual implements the binary operation '=='.
+// If this is being called at all, then the left and right objects
+// have a value that's a "reflect.Value". Also, they can be compared,
+// since the expression passed type checking.
+func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
+	isUntypedNil := func(t types.Type) bool {
+		if isTyped(t) {
+			return false
+		}
+		k := t.Underlying().(*types.Basic).Kind()
+		if k != types.UntypedNil {
+			return false
+		}
+		return true
+	}
+
+	lo := env.Eval(left)[0]
+	ro := env.Eval(right)[0]
+	var lv, rv reflect.Value
+
+	leftIsUntypedNil, rightIsUntypedNil := true, true
+	if !isUntypedNil(lo.Typ) {
+		leftIsUntypedNil = false
+		lo = getTypedObject(lo)
+		lv = lo.Value.(reflect.Value)
+	}
+	if !isUntypedNil(ro.Typ) {
+		rightIsUntypedNil = false
+		ro = getTypedObject(ro)
+		rv = ro.Value.(reflect.Value)
+	}
+
+	var equal bool
+	switch {
+	case leftIsUntypedNil:
+		equal = rightIsUntypedNil || rv.IsNil()
+	case rightIsUntypedNil:
+		equal = lv.IsNil()
+	case types.Identical(lo.Typ, ro.Typ):
+		equal = lv.Interface() == rv.Interface()
+	case types.AssignableTo(lo.Typ, ro.Typ):
+		clv := lv.Convert(rv.Type())
+		equal = clv.Interface() == rv.Interface()
+	default:
+		crv := rv.Convert(lv.Type())
+		equal = lv.Interface() == crv.Interface()
+	}
+
+	newTyp := env.info.TypeOf(binExpr)
+	var newVal reflect.Value
+	if _, isNamed := newTyp.(*types.Named); isNamed {
+		// Type is not "bool" but some other named boolean type.
+		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		if newRtyp == nil {
+			log.Fatal("operatorEqual: Couldn't get reflect.Type from types.Type")
+		}
+		newVal = reflect.New(newRtyp).Elem()
+		newVal.SetBool(equal)
+	} else {
+		// Type is "bool" or "untyped bool". Use "bool".
+		newVal = reflect.ValueOf(equal)
 	}
 
 	return Object{
