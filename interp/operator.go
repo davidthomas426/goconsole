@@ -1,13 +1,68 @@
 package interp
 
 import (
-	"go/ast"
+	"go/token"
 	"log"
 	"reflect"
 
 	"golang.org/x/tools/go/exact"
 	"golang.org/x/tools/go/types"
 )
+
+// Map from assignment operation token (op=) to operator (op)
+var assignOps map[token.Token]token.Token
+
+func doBinaryOp(env *environ, left, right Object, op token.Token) Object {
+	var obj Object
+	switch op {
+	case token.ADD:
+		obj = operatorAdd(env, left, right)
+	case token.SUB:
+		obj = operatorSubtract(env, left, right)
+	case token.MUL:
+		obj = operatorMultiply(env, left, right)
+	case token.QUO:
+		obj = operatorQuotient(env, left, right)
+	case token.REM:
+		obj = operatorRemainder(env, left, right)
+	case token.AND:
+		obj = operatorAnd(env, left, right)
+	case token.OR:
+		obj = operatorOr(env, left, right)
+	case token.XOR:
+		obj = operatorXor(env, left, right)
+	case token.AND_NOT:
+		obj = operatorAndNot(env, left, right)
+	case token.SHR:
+		obj = operatorShiftRight(env, left, right)
+	case token.SHL:
+		obj = operatorShiftLeft(env, left, right)
+	default:
+		// TODO: Implement other binary operators
+		log.Fatalf("Binary operator %v not implemented yet", op)
+	}
+	return obj
+}
+
+func doBinaryComparisonOp(env *environ, left, right Object, op token.Token, typ types.Type) Object {
+	var obj Object
+	switch op {
+	case token.LSS:
+		obj = operatorLess(env, left, right, typ)
+	case token.GTR:
+		obj = operatorGreater(env, left, right, typ)
+	case token.LEQ:
+		obj = operatorLessEqual(env, left, right, typ)
+	case token.GEQ:
+		obj = operatorGreaterEqual(env, left, right, typ)
+	case token.EQL:
+		obj = operatorEqual(env, left, right, typ)
+	default:
+		// TODO: Implement other binary operators
+		log.Fatalf("Binary comparison operator %v not implemented yet", op)
+	}
+	return obj
+}
 
 func getTypedObject(obj Object) Object {
 	if isTyped(obj.Typ) {
@@ -65,16 +120,13 @@ func getTypedObject(obj Object) Object {
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, both have the same type,
 // since the expression passed type checking.
-func operatorAdd(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorAdd(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorAdd: Couldn't get reflect.Type from types.Type")
@@ -131,7 +183,7 @@ func operatorAdd(env *environ, left, right ast.Expr) Object {
 		sum := lv.String() + rv.String()
 		newVal.SetString(sum)
 	default:
-		panic("Type error: Invalid operands to addition: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to addition: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 
 	return Object{
@@ -141,16 +193,13 @@ func operatorAdd(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorSubtract implements the binary operation '-'.
-func operatorSubtract(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorSubtract(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorSubtract: Couldn't get reflect.Type from types.Type")
@@ -204,7 +253,7 @@ func operatorSubtract(env *environ, left, right ast.Expr) Object {
 		diff := complex128(lv.Complex()) - complex128(rv.Complex())
 		newVal.SetComplex(complex128(diff))
 	default:
-		panic("Type error: Invalid operands to subtraction: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to subtraction: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -213,16 +262,13 @@ func operatorSubtract(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorMultiply implements the binary operation '*'.
-func operatorMultiply(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorMultiply(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorMultiply: Couldn't get reflect.Type from types.Type")
@@ -276,7 +322,7 @@ func operatorMultiply(env *environ, left, right ast.Expr) Object {
 		prod := complex128(lv.Complex()) * complex128(rv.Complex())
 		newVal.SetComplex(complex128(prod))
 	default:
-		panic("Type error: Invalid operands to multiplication: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to multiplication: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -285,16 +331,13 @@ func operatorMultiply(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorQuotient implements the binary operation '/'.
-func operatorQuotient(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorQuotient(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorQuotient: Couldn't get reflect.Type from types.Type")
@@ -348,7 +391,7 @@ func operatorQuotient(env *environ, left, right ast.Expr) Object {
 		quot := complex128(lv.Complex()) / complex128(rv.Complex())
 		newVal.SetComplex(complex128(quot))
 	default:
-		panic("Type error: Invalid operands to division: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to division: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -357,16 +400,13 @@ func operatorQuotient(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorRemainder implements the binary operation '%'.
-func operatorRemainder(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorRemainder(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorRemainder: Couldn't get reflect.Type from types.Type")
@@ -408,7 +448,7 @@ func operatorRemainder(env *environ, left, right ast.Expr) Object {
 		rem := uintptr(lv.Uint()) % uintptr(rv.Uint())
 		newVal.SetUint(uint64(rem))
 	default:
-		panic("Type error: Invalid operands to '%' operator: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to '%' operator: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -417,16 +457,13 @@ func operatorRemainder(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorAnd implements the binary operation '&'.
-func operatorAnd(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorAnd(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorAnd: Couldn't get reflect.Type from types.Type")
@@ -468,7 +505,7 @@ func operatorAnd(env *environ, left, right ast.Expr) Object {
 		and := uintptr(lv.Uint()) & uintptr(rv.Uint())
 		newVal.SetUint(uint64(and))
 	default:
-		panic("Type error: Invalid operands to '&' operator: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to '&' operator: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -477,16 +514,13 @@ func operatorAnd(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorOr implements the binary operation '|'.
-func operatorOr(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorOr(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorOr: Couldn't get reflect.Type from types.Type")
@@ -528,7 +562,7 @@ func operatorOr(env *environ, left, right ast.Expr) Object {
 		or := uintptr(lv.Uint()) | uintptr(rv.Uint())
 		newVal.SetUint(uint64(or))
 	default:
-		panic("Type error: Invalid operands to '|' operator: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to '|' operator: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -537,16 +571,13 @@ func operatorOr(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorXor implements the binary operation '^'.
-func operatorXor(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorXor(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorXor: Couldn't get reflect.Type from types.Type")
@@ -588,7 +619,7 @@ func operatorXor(env *environ, left, right ast.Expr) Object {
 		xor := uintptr(lv.Uint()) ^ uintptr(rv.Uint())
 		newVal.SetUint(uint64(xor))
 	default:
-		panic("Type error: Invalid operands to '^' operator: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to '^' operator: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -597,16 +628,13 @@ func operatorXor(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorAndNot implements the binary operation '&^'.
-func operatorAndNot(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorAndNot(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorAndNot: Couldn't get reflect.Type from types.Type")
@@ -648,7 +676,7 @@ func operatorAndNot(env *environ, left, right ast.Expr) Object {
 		andNot := uintptr(lv.Uint()) &^ uintptr(rv.Uint())
 		newVal.SetUint(uint64(andNot))
 	default:
-		panic("Type error: Invalid operands to '&^' operator: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to '&^' operator: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -657,23 +685,20 @@ func operatorAndNot(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorShiftRight implements the binary operation '>>'.
-func operatorShiftRight(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorShiftRight(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	lv := left.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	lv := lo.Value.(reflect.Value)
-
-	rv, ok := ro.Value.(reflect.Value)
+	rv, ok := right.Value.(reflect.Value)
 	if !ok {
 		// We have an exact.Value. Turn it into a uint64 and set rv from that
-		ev := ro.Value.(exact.Value)
+		ev := right.Value.(exact.Value)
 		v64, _ := exact.Uint64Val(ev)
 		rv = reflect.ValueOf(v64)
 	}
 	amt := rv.Uint()
 
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorShiftRight: Couldn't get reflect.Type from types.Type")
@@ -715,7 +740,7 @@ func operatorShiftRight(env *environ, left, right ast.Expr) Object {
 		shifted := uintptr(lv.Uint()) >> amt
 		newVal.SetUint(uint64(shifted))
 	default:
-		panic("Type error: Invalid operands to shift: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to shift: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -724,23 +749,20 @@ func operatorShiftRight(env *environ, left, right ast.Expr) Object {
 }
 
 // operatorShiftLeft implements the binary operation '<<'.
-func operatorShiftLeft(env *environ, left, right ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorShiftLeft(env *environ, left, right Object) Object {
+	left = getTypedObject(left)
+	lv := left.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	lv := lo.Value.(reflect.Value)
-
-	rv, ok := ro.Value.(reflect.Value)
+	rv, ok := right.Value.(reflect.Value)
 	if !ok {
 		// We have an exact.Value. Turn it into a uint64 and set rv from that
-		ev := ro.Value.(exact.Value)
+		ev := right.Value.(exact.Value)
 		v64, _ := exact.Uint64Val(ev)
 		rv = reflect.ValueOf(v64)
 	}
 	amt := rv.Uint()
 
-	newTyp := lo.Typ
+	newTyp := left.Typ
 	newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
 	if newRtyp == nil {
 		log.Fatal("operatorShiftLeft: Couldn't get reflect.Type from types.Type")
@@ -779,7 +801,7 @@ func operatorShiftLeft(env *environ, left, right ast.Expr) Object {
 		shifted := uintptr(lv.Uint()) << amt
 		newVal.SetUint(uint64(shifted))
 	default:
-		panic("Type error: Invalid operands to shift: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to shift: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 	return Object{
 		Value: newVal,
@@ -791,16 +813,12 @@ func operatorShiftLeft(env *environ, left, right ast.Expr) Object {
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, they can be compared,
 // since the expression passed type checking.
-func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorLess(env *environ, left, right Object, typ types.Type) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := env.info.TypeOf(binExpr)
 	less := false
 	switch lv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -812,13 +830,13 @@ func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
 	case reflect.String:
 		less = lv.String() < rv.String()
 	default:
-		panic("Type error: Invalid operands to ordered comparison: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to ordered comparison: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 
 	var newVal reflect.Value
-	if _, isNamed := newTyp.(*types.Named); isNamed {
+	if _, isNamed := typ.(*types.Named); isNamed {
 		// Type is not "bool" but some other named boolean type.
-		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		newRtyp, _ := getReflectType(env.interp.typeMap, typ)
 		if newRtyp == nil {
 			log.Fatal("operatorLess: Couldn't get reflect.Type from types.Type")
 		}
@@ -831,7 +849,7 @@ func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
 
 	return Object{
 		Value: newVal,
-		Typ:   newTyp,
+		Typ:   typ,
 	}
 }
 
@@ -839,47 +857,43 @@ func operatorLess(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, they can be compared,
 // since the expression passed type checking.
-func operatorGreater(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorGreater(env *environ, left, right Object, typ types.Type) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := env.info.TypeOf(binExpr)
-	less := false
+	greater := false
 	switch lv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		less = lv.Int() > rv.Int()
+		greater = lv.Int() > rv.Int()
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		less = lv.Uint() > rv.Uint()
+		greater = lv.Uint() > rv.Uint()
 	case reflect.Float32, reflect.Float64:
-		less = lv.Float() > rv.Float()
+		greater = lv.Float() > rv.Float()
 	case reflect.String:
-		less = lv.String() > rv.String()
+		greater = lv.String() > rv.String()
 	default:
-		panic("Type error: Invalid operands to ordered comparison: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to ordered comparison: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 
 	var newVal reflect.Value
-	if _, isNamed := newTyp.(*types.Named); isNamed {
+	if _, isNamed := typ.(*types.Named); isNamed {
 		// Type is not "bool" but some other named boolean type.
-		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		newRtyp, _ := getReflectType(env.interp.typeMap, typ)
 		if newRtyp == nil {
 			log.Fatal("operatorGreater: Couldn't get reflect.Type from types.Type")
 		}
 		newVal = reflect.New(newRtyp).Elem()
-		newVal.SetBool(less)
+		newVal.SetBool(greater)
 	} else {
 		// Type is "bool" or "untyped bool". Use "bool".
-		newVal = reflect.ValueOf(less)
+		newVal = reflect.ValueOf(greater)
 	}
 
 	return Object{
 		Value: newVal,
-		Typ:   newTyp,
+		Typ:   typ,
 	}
 }
 
@@ -887,47 +901,43 @@ func operatorGreater(env *environ, left, right ast.Expr, binExpr ast.Expr) Objec
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, they can be compared,
 // since the expression passed type checking.
-func operatorLessEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorLessEqual(env *environ, left, right Object, typ types.Type) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := env.info.TypeOf(binExpr)
-	less := false
+	lessEqual := false
 	switch lv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		less = lv.Int() <= rv.Int()
+		lessEqual = lv.Int() <= rv.Int()
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		less = lv.Uint() <= rv.Uint()
+		lessEqual = lv.Uint() <= rv.Uint()
 	case reflect.Float32, reflect.Float64:
-		less = lv.Float() <= rv.Float()
+		lessEqual = lv.Float() <= rv.Float()
 	case reflect.String:
-		less = lv.String() <= rv.String()
+		lessEqual = lv.String() <= rv.String()
 	default:
-		panic("Type error: Invalid operands to ordered comparison: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to ordered comparison: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 
 	var newVal reflect.Value
-	if _, isNamed := newTyp.(*types.Named); isNamed {
+	if _, isNamed := typ.(*types.Named); isNamed {
 		// Type is not "bool" but some other named boolean type.
-		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		newRtyp, _ := getReflectType(env.interp.typeMap, typ)
 		if newRtyp == nil {
 			log.Fatal("operatorLessEqual: Couldn't get reflect.Type from types.Type")
 		}
 		newVal = reflect.New(newRtyp).Elem()
-		newVal.SetBool(less)
+		newVal.SetBool(lessEqual)
 	} else {
 		// Type is "bool" or "untyped bool". Use "bool".
-		newVal = reflect.ValueOf(less)
+		newVal = reflect.ValueOf(lessEqual)
 	}
 
 	return Object{
 		Value: newVal,
-		Typ:   newTyp,
+		Typ:   typ,
 	}
 }
 
@@ -935,47 +945,43 @@ func operatorLessEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Obj
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, they can be compared,
 // since the expression passed type checking.
-func operatorGreaterEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
+func operatorGreaterEqual(env *environ, left, right Object, typ types.Type) Object {
+	left = getTypedObject(left)
+	right = getTypedObject(right)
+	lv := left.Value.(reflect.Value)
+	rv := right.Value.(reflect.Value)
 
-	lo = getTypedObject(lo)
-	ro = getTypedObject(ro)
-	lv := lo.Value.(reflect.Value)
-	rv := ro.Value.(reflect.Value)
-
-	newTyp := env.info.TypeOf(binExpr)
-	less := false
+	greaterEqual := false
 	switch lv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		less = lv.Int() >= rv.Int()
+		greaterEqual = lv.Int() >= rv.Int()
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		less = lv.Uint() >= rv.Uint()
+		greaterEqual = lv.Uint() >= rv.Uint()
 	case reflect.Float32, reflect.Float64:
-		less = lv.Float() >= rv.Float()
+		greaterEqual = lv.Float() >= rv.Float()
 	case reflect.String:
-		less = lv.String() >= rv.String()
+		greaterEqual = lv.String() >= rv.String()
 	default:
-		panic("Type error: Invalid operands to ordered comparison: " + TypeString(lo.Typ) + ", " + TypeString(ro.Typ))
+		panic("Type error: Invalid operands to ordered comparison: " + TypeString(left.Typ) + ", " + TypeString(right.Typ))
 	}
 
 	var newVal reflect.Value
-	if _, isNamed := newTyp.(*types.Named); isNamed {
+	if _, isNamed := typ.(*types.Named); isNamed {
 		// Type is not "bool" but some other named boolean type.
-		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		newRtyp, _ := getReflectType(env.interp.typeMap, typ)
 		if newRtyp == nil {
 			log.Fatal("operatorGreaterEqual: Couldn't get reflect.Type from types.Type")
 		}
 		newVal = reflect.New(newRtyp).Elem()
-		newVal.SetBool(less)
+		newVal.SetBool(greaterEqual)
 	} else {
 		// Type is "bool" or "untyped bool". Use "bool".
-		newVal = reflect.ValueOf(less)
+		newVal = reflect.ValueOf(greaterEqual)
 	}
 
 	return Object{
 		Value: newVal,
-		Typ:   newTyp,
+		Typ:   typ,
 	}
 }
 
@@ -983,7 +989,7 @@ func operatorGreaterEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) 
 // If this is being called at all, then the left and right objects
 // have a value that's a "reflect.Value". Also, they can be compared,
 // since the expression passed type checking.
-func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object {
+func operatorEqual(env *environ, left, right Object, typ types.Type) Object {
 	isUntypedNil := func(t types.Type) bool {
 		if isTyped(t) {
 			return false
@@ -995,20 +1001,18 @@ func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object 
 		return true
 	}
 
-	lo := env.Eval(left)[0]
-	ro := env.Eval(right)[0]
 	var lv, rv reflect.Value
 
 	leftIsUntypedNil, rightIsUntypedNil := true, true
-	if !isUntypedNil(lo.Typ) {
+	if !isUntypedNil(left.Typ) {
 		leftIsUntypedNil = false
-		lo = getTypedObject(lo)
-		lv = lo.Value.(reflect.Value)
+		left = getTypedObject(left)
+		lv = left.Value.(reflect.Value)
 	}
-	if !isUntypedNil(ro.Typ) {
+	if !isUntypedNil(right.Typ) {
 		rightIsUntypedNil = false
-		ro = getTypedObject(ro)
-		rv = ro.Value.(reflect.Value)
+		right = getTypedObject(right)
+		rv = right.Value.(reflect.Value)
 	}
 
 	var equal bool
@@ -1017,9 +1021,9 @@ func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object 
 		equal = rightIsUntypedNil || rv.IsNil()
 	case rightIsUntypedNil:
 		equal = lv.IsNil()
-	case types.Identical(lo.Typ, ro.Typ):
+	case types.Identical(left.Typ, right.Typ):
 		equal = lv.Interface() == rv.Interface()
-	case types.AssignableTo(lo.Typ, ro.Typ):
+	case types.AssignableTo(left.Typ, right.Typ):
 		clv := lv.Convert(rv.Type())
 		equal = clv.Interface() == rv.Interface()
 	default:
@@ -1027,11 +1031,10 @@ func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object 
 		equal = lv.Interface() == crv.Interface()
 	}
 
-	newTyp := env.info.TypeOf(binExpr)
 	var newVal reflect.Value
-	if _, isNamed := newTyp.(*types.Named); isNamed {
+	if _, isNamed := typ.(*types.Named); isNamed {
 		// Type is not "bool" but some other named boolean type.
-		newRtyp, _ := getReflectType(env.interp.typeMap, newTyp)
+		newRtyp, _ := getReflectType(env.interp.typeMap, typ)
 		if newRtyp == nil {
 			log.Fatal("operatorEqual: Couldn't get reflect.Type from types.Type")
 		}
@@ -1044,6 +1047,6 @@ func operatorEqual(env *environ, left, right ast.Expr, binExpr ast.Expr) Object 
 
 	return Object{
 		Value: newVal,
-		Typ:   newTyp,
+		Typ:   typ,
 	}
 }

@@ -159,44 +159,18 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 			log.Fatalf("Unary operator %q not implemented", e.Op)
 		}
 	case *ast.BinaryExpr:
+		left := env.Eval(e.X)[0]
+		right := env.Eval(e.Y)[0]
+
 		var obj Object
+
 		switch e.Op {
-		case token.ADD:
-			obj = operatorAdd(env, e.X, e.Y)
-		case token.SUB:
-			obj = operatorSubtract(env, e.X, e.Y)
-		case token.MUL:
-			obj = operatorMultiply(env, e.X, e.Y)
-		case token.QUO:
-			obj = operatorQuotient(env, e.X, e.Y)
-		case token.REM:
-			obj = operatorRemainder(env, e.X, e.Y)
-		case token.AND:
-			obj = operatorAnd(env, e.X, e.Y)
-		case token.OR:
-			obj = operatorOr(env, e.X, e.Y)
-		case token.XOR:
-			obj = operatorXor(env, e.X, e.Y)
-		case token.AND_NOT:
-			obj = operatorAndNot(env, e.X, e.Y)
-		case token.SHR:
-			obj = operatorShiftRight(env, e.X, e.Y)
-		case token.SHL:
-			obj = operatorShiftLeft(env, e.X, e.Y)
-		case token.LSS:
-			obj = operatorLess(env, e.X, e.Y, e)
-		case token.GTR:
-			obj = operatorGreater(env, e.X, e.Y, e)
-		case token.LEQ:
-			obj = operatorLessEqual(env, e.X, e.Y, e)
-		case token.GEQ:
-			obj = operatorGreaterEqual(env, e.X, e.Y, e)
-		case token.EQL:
-			obj = operatorEqual(env, e.X, e.Y, e)
+		case token.LSS, token.GTR, token.LEQ, token.GEQ, token.EQL, token.NEQ:
+			obj = doBinaryComparisonOp(env, left, right, e.Op, typ)
 		default:
-			// TODO: Implement other binary operators (comparisons, for example)
-			log.Fatalf("Binary operator %v not implemented yet", e.Op)
+			obj = doBinaryOp(env, left, right, e.Op)
 		}
+
 		return []Object{obj}
 	case *ast.Ident:
 		val, _ := env.lookupParent(e.String())
