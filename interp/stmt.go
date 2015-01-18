@@ -82,6 +82,14 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 				assignObj(lhs[i], rhs[i])
 			}
 		}
+	case *ast.IncDecStmt:
+		obj := env.Eval(stmt.X)[0]
+		switch stmt.Tok {
+		case token.INC:
+			doInc(obj)
+		case token.DEC:
+			doDec(obj)
+		}
 	case *ast.ExprStmt:
 		// If we're not at top level, then only call expressions and receive operations are valid statements
 		if !topLevel {
