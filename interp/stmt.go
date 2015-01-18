@@ -50,16 +50,29 @@ func (env *environ) runStmt(stmt ast.Stmt, label string, topLevel bool) stmtResu
 		// First, get LHS
 		var lhs []Object
 		var mapIndexExprs map[int]bool
+
 		switch stmt.Tok {
 		case token.DEFINE:
 			// Short variable declaration
 			lhs = env.getDeclVars(stmt.Lhs)
-		case token.ASSIGN:
+		default:
+			// Normal assignment or assignment operation (= or op=)
 			lhs, mapIndexExprs = env.getAssignmentLhs(stmt.Lhs)
 		}
 
 		// Second, evaluate RHS
 		rhs := env.evalExprs(stmt.Rhs)
+
+		// Do assignment operation if applicable
+		if stmt.Tok != token.DEFINE && stmt.Tok != token.ASSIGN {
+			// The spec guarantees that there is exactly one lhs and rhs
+			op := assignOps[stmt.Tok]
+			obj := doBinaryOp(env, lhs[0], rhs[0], op)
+
+			// Just replace the rhs with the result of the binary op
+			// Then process it as a normal assignment
+			rhs[0] = obj
+		}
 
 		// Finally, do the assignment
 		for i, _ := range lhs {

@@ -10,7 +10,22 @@ import (
 )
 
 // Map from assignment operation token (op=) to operator (op)
-var assignOps map[token.Token]token.Token
+var assignOps = map[token.Token]token.Token{
+	// Arithmetic
+	token.ADD_ASSIGN: token.ADD,
+	token.SUB_ASSIGN: token.SUB,
+	token.MUL_ASSIGN: token.MUL,
+	token.QUO_ASSIGN: token.QUO,
+	token.REM_ASSIGN: token.REM,
+
+	// Bitwise
+	token.AND_ASSIGN:     token.AND,
+	token.AND_NOT_ASSIGN: token.AND_NOT,
+	token.OR_ASSIGN:      token.OR,
+	token.SHL_ASSIGN:     token.SHL,
+	token.SHR_ASSIGN:     token.SHR,
+	token.XOR_ASSIGN:     token.XOR,
+}
 
 func doBinaryOp(env *environ, left, right Object, op token.Token) Object {
 	var obj Object
