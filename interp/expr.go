@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"log"
@@ -158,6 +159,121 @@ func (env *environ) Eval(expr ast.Expr) []Object {
 		default:
 			log.Fatalf("Unary operator %q not implemented", e.Op)
 		}
+
+	case *ast.TypeAssertExpr:
+		// type assertion x.(T)
+
+		// if T is interface type:
+		//    * assert that x's dynamic type implements T
+		//    * if so, value of expr is T(val in x) or [T(val in x), true]
+		//    * otherwise, runtime panic or [ zero val of T, false ]
+
+		// if T is of non-interface type:
+		//    * assert that x's dynamic type is identical to T
+		//    * if so, value of expr is (val in x) or [ (val in x), true]
+		//    * otherwise, runtime panic or [ zero val of T, false ]
+
+		// types T and V are identical if and only if all of the following are true:
+		//    * values of T are assignable to V,
+		//    * both or neither of T and V are named types (that is, isNamed(T) == isNamed(V)),
+		//    * (T is not a channel type) OR (dir of T == dir of V)
+
+		eTyp := typ
+
+		// If the expression has tuple type, then it's a "comma, ok" type assertion
+		_, commaOk := eTyp.(*types.Tuple)
+
+		toTyp := env.info.TypeOf(e.Type)
+		toRtyp, sim := getReflectType(env.interp.typeMap, toTyp)
+		if toRtyp == nil {
+			log.Fatalf("Couldn't get reflect type: %v", toTyp)
+		}
+
+		obj := env.Eval(e.X)[0]
+		objVal := obj.Value.(reflect.Value)
+		dynamicVal := objVal.Elem()
+		dynamicRtyp := dynamicVal.Type()
+
+		var resultObj Object
+		var assertSuccess bool
+
+		switch typ.Underlying().(type) {
+		case *types.Interface:
+			// assert that dynamic type of obj implements typ
+			// TODO This should be a runtime panic if not
+
+			assertSuccess = objVal.Type().Implements(toRtyp)
+
+			if assertSuccess {
+				resultVal := dynamicVal.Convert(toRtyp)
+				resultObj = Object{
+					Sim:   sim,
+					Typ:   toTyp,
+					Value: resultVal,
+				}
+			} else if !commaOk {
+				// TODO this should be a runtime panic
+				err := fmt.Errorf("interface conversion: interface is %v, not %v", dynamicRtyp, toRtyp)
+				panic(err)
+			} else {
+				resultObj = Object{
+					Sim:   sim,
+					Typ:   toTyp,
+					Value: reflect.Zero(toRtyp),
+				}
+			}
+
+		default:
+			isNamed := func(t reflect.Type) bool {
+				return len(t.Name()) > 0
+			}
+
+			areIdentical := func(t1, t2 reflect.Type) bool {
+				if !t1.AssignableTo(t2) {
+					return false
+				}
+				if isNamed(t1) != isNamed(t2) {
+					return false
+				}
+				if t1.Kind() == reflect.Chan && t1.ChanDir() != t2.ChanDir() {
+					return false
+				}
+				return true
+			}
+
+			assertSuccess = areIdentical(dynamicRtyp, toRtyp)
+			if assertSuccess {
+				resultVal := dynamicVal.Convert(toRtyp)
+				resultObj = Object{
+					Sim:   sim,
+					Typ:   toTyp,
+					Value: resultVal,
+				}
+			} else if !commaOk {
+				// TODO this should be a runtime panic
+				err := fmt.Errorf("interface conversion: interface is %v, not %v", dynamicRtyp, toRtyp)
+				panic(err)
+			} else {
+				resultObj = Object{
+					Sim:   sim,
+					Typ:   toTyp,
+					Value: reflect.Zero(toRtyp),
+				}
+			}
+		}
+
+		// Return the appropriate
+		if commaOk {
+			successObj := Object{
+				Sim:   false,
+				Typ:   types.Typ[types.Bool],
+				Value: reflect.ValueOf(assertSuccess),
+			}
+			return []Object{resultObj, successObj}
+		} else {
+			return []Object{resultObj}
+		}
+
 	case *ast.BinaryExpr:
 		left := env.Eval(e.X)[0]
 		right := env.Eval(e.Y)[0]
